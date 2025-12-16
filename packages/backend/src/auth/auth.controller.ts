@@ -5,7 +5,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { UserEntity } from '../entities/user.entity';
-import { AgentStatus } from './enums/agent-status.enum';
+import { AgentStatus } from '@psynq/core';
 
 @Controller('auth')
 export class AuthController {

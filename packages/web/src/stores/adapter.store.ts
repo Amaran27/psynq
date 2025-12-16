@@ -10,7 +10,7 @@ interface AdapterActions {
   initializeAdapter: () => void;
 }
 
-export const useAdapterStore = create<AdapterState & AdapterActions>((set) => ({
+export const useAdapterStore = create<AdapterState & AdapterActions>((set, get) => ({
   apiAdapter: null,
   initializeAdapter: () => {
     if (!get().apiAdapter) {

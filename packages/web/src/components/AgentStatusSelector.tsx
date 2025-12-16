@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AgentStatus } from '../../backend/src/auth/enums/agent-status.enum';
+import { AgentStatus } from '@psynq/core';
 
 interface AgentStatusSelectorProps {
   currentStatus: AgentStatus;

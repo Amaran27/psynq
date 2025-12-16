@@ -5,7 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserEntity, UserRole } from '../entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
-import { AgentStatus } from './enums/agent-status.enum';
+import { AgentStatus } from '@psynq/core';
 import { CallService } from '../services/call.service';
 
 @Injectable()

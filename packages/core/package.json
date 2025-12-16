@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
+  "type": "commonjs",
   "devDependencies": {
     "@types/node": "^25.0.1",
     "typescript": "^5.9.3"

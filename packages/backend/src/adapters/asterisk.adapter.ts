@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { TelephonyPort } from '../ports/telephony.port';
 import { Call, CallState } from '@psynq/core';
+import { TelephonyCapabilities } from '../interfaces/telephony-capabilities.interface';
+import { CallParticipant, SupervisorControlOptions } from '../interfaces/call-participant.interface';
 import * as ari from 'ari-client';
 
 @Injectable()
@@ -11,6 +13,16 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
 
   async onModuleInit() {
     await this.connectToAsterisk();
+  }
+
+  getCapabilities(): TelephonyCapabilities {
+    return {
+      supportsSupervisorInjection: true,
+      supportsParticipantMute: false,
+      supportsParticipantHold: false,
+      supportsBridgeCall: true,
+      supportsTransfer: false
+    };
   }
 
   private async connectToAsterisk() {
@@ -97,9 +109,28 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
     }
   }
 
-  async injectSupervisor(callId: string, supervisorId: string): Promise<void> {
+  async injectSupervisor(callId: string, supervisorId: string, options?: SupervisorControlOptions): Promise<CallParticipant | void> {
     // Similar to bridge, but for supervisor
     await this.bridgeCall(callId, supervisorId);
+    // Return a dummy participant for now as Asterisk implementation is incomplete
+    return {
+      id: `sup_${Date.now()}`,
+      callId,
+      participantId: supervisorId,
+      participantType: 'supervisor',
+      providerCallSid: `chan_${Date.now()}`,
+      isMuted: options?.initialMuteState !== false,
+      isOnHold: false,
+      joinedAt: new Date()
+    };
+  }
+
+  async setParticipantMuted(participantId: string, muted: boolean): Promise<void> {
+    console.warn('setParticipantMuted not implemented for Asterisk');
+  }
+
+  async setParticipantOnHold(participantId: string, onHold: boolean): Promise<void> {
+    console.warn('setParticipantOnHold not implemented for Asterisk');
   }
 
   async endCall(callId: string): Promise<void> {

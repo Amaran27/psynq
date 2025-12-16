@@ -5,9 +5,11 @@ import { Call, CallState, CallStateMachine, CallStateTransitionError, CallDirect
 import { CreateCallDto, CallResponseDto } from '../dtos/call.dto';
 import { CallGateway } from '../call.gateway';
 import { TwilioAdapter } from '../adapters/twilio.adapter';
-import { InfobipAdapter } from '../telephony/infobip.adapter';
+import { InfobipAdapter } from '../adapters/infobip.adapter';
 import { CallEntity } from '../entities/call.entity';
 import { ConfigService } from '@nestjs/config';
+import { CallParticipant, SupervisorControlOptions } from '../interfaces/call-participant.interface';
+import { CallParticipantService } from './call-participant.service';
 
 @Injectable()
 export class CallService {
@@ -20,6 +22,7 @@ export class CallService {
     private readonly twilioAdapter: TwilioAdapter,
     private readonly infobipAdapter: InfobipAdapter,
     private readonly configService: ConfigService,
+    private readonly callParticipantService: CallParticipantService,
   ) {}
 
   /**
@@ -44,9 +47,9 @@ export class CallService {
       await this.infobipAdapter.makeCall({ from: call.from, to: call.to, callId: call.id, agentId: call.agentId });
     } else {
       // TwilioAdapter may return the external Twilio call SID so we can map and operate on it later
-      const twilioSid = await this.twilioAdapter.createCall(call);
-      if (twilioSid) {
-        call.twilioSid = twilioSid;
+      const externalId = await this.twilioAdapter.createCall(call);
+      if (externalId) {
+        call.externalId = externalId;
       }
     }
 
@@ -79,7 +82,7 @@ export class CallService {
     console.log(`Found call ${callSid} in queue. Assigning to agent ${agentId}.`);
 
     // Assign agent to the call in our DB
-    const callEntity = await this.callRepository.findOneBy({ twilioSid: callSid });
+    const callEntity = await this.callRepository.findOneBy({ externalId: callSid });
     if (callEntity) {
       callEntity.agentId = agentId;
       await this.callRepository.save(callEntity);
@@ -113,6 +116,22 @@ export class CallService {
   }
 
   /**
+   * Helper to generate provider-specific participant ID string or object depending on adapter.
+   */
+  private getProviderParticipantId(adapter: any, supervisor: any): string {
+    // If provider-specific data already contains conference+participant SID (Twilio), prefer that
+    if (supervisor?.providerSpecificData?.conferenceName && supervisor?.providerSpecificData?.twilioParticipantSid) {
+      return `${supervisor.providerSpecificData.conferenceName}:${supervisor.providerSpecificData.twilioParticipantSid}`;
+    }
+
+    // Fallback to providerCallSid if available
+    if (supervisor?.providerCallSid) return supervisor.providerCallSid;
+
+    // As a final fallback, use participant id
+    return supervisor.id;
+  }
+
+  /**
    * Gets a call by ID from the database.
    */
   async getCall(callId: string): Promise<CallResponseDto> {
@@ -136,7 +155,7 @@ export class CallService {
       
       await this.callRepository.save(this.domainToEntity(call));
       
-      if (agentId) await this.twilioAdapter.bridgeCall(call.twilioSid || call.id, agentId);
+      if (agentId) await this.twilioAdapter.bridgeCall(call.externalId || call.id, agentId);
       
       this.callGateway.emitCallUpdate(call);
       return this.mapToResponseDto(call);
@@ -150,31 +169,47 @@ export class CallService {
 
   /**
    * Injects a supervisor into an active call (whisper/barge-in support).
-   * Persists the external participant identifier returned by the provider.
+   * Uses the new participant management approach.
    */
-  async injectSupervisor(callId: string, supervisorId: string): Promise<CallResponseDto> {
+  async injectSupervisor(callId: string, supervisorId: string, options?: SupervisorControlOptions): Promise<CallParticipant> {
     const callEntity = await this.findCallEntityOrFail(callId);
     const call = this.entityToDomain(callEntity);
 
-    // Use provider-specific implementation to inject the supervisor and obtain a participant SID
+    // Choose adapter based on provider
     const provider = this.selectProvider(call.to);
-    let participantSid: string | undefined;
-    if (provider === 'infobip') {
-      // Infobip adapter does not yet implement supervisor injection; log and throw
-      this.logger?.warn?.('Infobip supervisor injection not implemented');
+    const adapter = (provider as string) === 'infobip' ? this.infobipAdapter : this.twilioAdapter;
+
+    const capabilities = adapter.getCapabilities?.();
+    if (!capabilities || !capabilities.supportsSupervisorInjection) {
+      this.logger?.warn?.('Selected provider does not support supervisor injection');
       throw new BadRequestException('Supervisor injection is not supported for Infobip at this time');
-    } else {
-      const externalId = call.twilioSid || callId;
-      participantSid = await this.twilioAdapter.injectSupervisor(externalId, supervisorId) as string | undefined;
     }
 
-    if (participantSid) {
-      call.supervisorParticipantSid = participantSid;
+    const externalId = call.externalId || callId;
+    const participant = await adapter.injectSupervisor(externalId, supervisorId, options);
+
+    if (participant) {
+      // Store the participant information
+      await this.callParticipantService.addParticipant({
+        callId,
+        participantId: supervisorId,
+        participantType: 'supervisor',
+        providerCallSid: participant.providerCallSid,
+        providerSpecificData: participant.providerSpecificData,
+        isMuted: participant.isMuted,
+        isOnHold: participant.isOnHold
+      });
+      
+      // For backward compatibility, also store the supervisorParticipantSid
+      call.providerMetadata = { ...call.providerMetadata, supervisorParticipantSid: participant.providerCallSid };
       await this.callRepository.save(this.domainToEntity(call));
+      
       this.callGateway.emitCallUpdate(call);
+      
+      return participant;
     }
 
-    return this.mapToResponseDto(call);
+    throw new BadRequestException('Failed to inject supervisor');
   }
 
   /**
@@ -184,18 +219,42 @@ export class CallService {
     const callEntity = await this.findCallEntityOrFail(callId);
     const call = this.entityToDomain(callEntity);
 
-    if (!call.supervisorParticipantSid) {
+    const provider = this.selectProvider(call.to);
+    // Infobip-specific: not supported
+    if (provider === 'infobip') {
+      this.logger?.warn?.('Infobip supervisor mute/unmute not implemented');
+      throw new BadRequestException('Supervisor injection is not supported for Infobip at this time');
+    }
+
+    // Choose adapter based on selected provider
+    const adapter = (provider as string) === 'infobip' ? this.infobipAdapter : this.twilioAdapter;
+
+    const capabilities = adapter.getCapabilities();
+    if (!capabilities.supportsParticipantMute) {
+      this.logger?.warn?.('Selected provider does not support participant mute/unmute');
+      throw new BadRequestException('Supervisor mute/unmute not supported for this provider at this time');
+    }
+
+    // Find the supervisor participant
+    const supervisors = await this.callParticipantService.getSupervisorsByCallId(callId);
+    if (supervisors.length === 0) {
       throw new BadRequestException('No supervisor is injected for this call');
     }
 
-    const provider = this.selectProvider(call.to);
-    if (provider === 'infobip') {
-      this.logger?.warn?.('Infobip supervisor mute/unmute not implemented');
-      throw new BadRequestException('Supervisor mute/unmute not supported for Infobip at this time');
+    const supervisor = supervisors[0]; // Get the first supervisor
+
+    // Prefer explicit Twilio conference-based id when present
+    let participantId: string;
+    if (supervisor?.providerSpecificData?.conferenceName && supervisor?.providerSpecificData?.twilioParticipantSid) {
+      participantId = `${supervisor.providerSpecificData.conferenceName}:${supervisor.providerSpecificData.twilioParticipantSid}`;
     } else {
-      const externalId = call.twilioSid || callId;
-      await this.twilioAdapter.setParticipantMuted(externalId, call.supervisorParticipantSid, false);
+      participantId = this.getProviderParticipantId(adapter, supervisor);
     }
+
+    await adapter.setParticipantMuted(participantId, false);
+    
+    // Update the participant in our database
+    await this.callParticipantService.updateParticipantMuteState(supervisor.id, false);
 
     this.callGateway.emitCallUpdate(call);
     return this.mapToResponseDto(call);
@@ -208,18 +267,40 @@ export class CallService {
     const callEntity = await this.findCallEntityOrFail(callId);
     const call = this.entityToDomain(callEntity);
 
-    if (!call.supervisorParticipantSid) {
+    const provider = this.selectProvider(call.to);
+    const adapter = (provider as string) === 'infobip' ? this.infobipAdapter : this.twilioAdapter;
+
+    if (provider === 'infobip') {
+      this.logger?.warn?.('Infobip supervisor mute/unmute not implemented');
+      throw new BadRequestException('Supervisor injection is not supported for Infobip at this time');
+    }
+
+    const capabilities = adapter.getCapabilities?.();
+    if (!capabilities || !capabilities.supportsParticipantMute) {
+      this.logger?.warn?.('Selected provider does not support participant mute/unmute');
+      throw new BadRequestException('Supervisor mute/unmute not supported for this provider at this time');
+    }
+
+    // Find the supervisor participant
+    const supervisors = await this.callParticipantService.getSupervisorsByCallId(callId);
+    if (!supervisors || supervisors.length === 0) {
       throw new BadRequestException('No supervisor is injected for this call');
     }
 
-    const provider = this.selectProvider(call.to);
-    if (provider === 'infobip') {
-      this.logger?.warn?.('Infobip supervisor mute/unmute not implemented');
-      throw new BadRequestException('Supervisor mute/unmute not supported for Infobip at this time');
+    const supervisor = supervisors[0]; // Get the first supervisor
+
+    // Prefer explicit Twilio conference-based id when present
+    let participantId: string;
+    if (supervisor?.providerSpecificData?.conferenceName && supervisor?.providerSpecificData?.twilioParticipantSid) {
+      participantId = `${supervisor.providerSpecificData.conferenceName}:${supervisor.providerSpecificData.twilioParticipantSid}`;
     } else {
-      const externalId = call.twilioSid || callId;
-      await this.twilioAdapter.setParticipantMuted(externalId, call.supervisorParticipantSid, true);
+      participantId = this.getProviderParticipantId(adapter, supervisor);
     }
+
+    await adapter.setParticipantMuted(participantId, true);
+    
+    // Update the participant in our database
+    await this.callParticipantService.updateParticipantMuteState(supervisor.id, true);
 
     this.callGateway.emitCallUpdate(call);
     return this.mapToResponseDto(call);
@@ -277,7 +358,7 @@ export class CallService {
         await this.infobipAdapter.endCall(callId);
       } else {
         // Use stored Twilio SID for provider operations when available
-        const externalId = call.twilioSid || callId;
+        const externalId = call.externalId || callId;
         await this.twilioAdapter.endCall(externalId);
       }
       
@@ -324,14 +405,57 @@ export class CallService {
    *   queued, ringing -> RINGING
    *   in-progress/answered -> ANSWERED
    *   completed/failed/busy/no-answer/canceled -> ENDED
+   * - For child call legs (with ParentCallSid), updates the parent call instead of creating separate entries.
    */
   async handleTwilioStatusCallback(twilioPayload: any) {
+    this.logger?.debug?.(`Twilio callback payload: ${JSON.stringify(twilioPayload)}`);
     const callSid = twilioPayload.CallSid;
     const status = (twilioPayload.CallStatus || '').toLowerCase();
     const isInbound = twilioPayload.Direction === 'inbound' || false;
+    const parentCallSid = twilioPayload.ParentCallSid;
+
+    // If this is a child leg, find and update the parent call instead
+    if (parentCallSid) {
+      const parentEntity = await this.callRepository.findOneBy({ externalId: parentCallSid });
+      if (parentEntity) {
+        const parentCall = this.entityToDomain(parentEntity);
+        // Update parent call state based on child status
+        try {
+          if (status === 'queued' || status === 'ringing') {
+            if (this.stateMachine.canTransition(parentCall, CallState.RINGING)) {
+              this.stateMachine.startCall(parentCall);
+            }
+          } else if (status === 'in-progress' || status === 'answered') {
+            if (this.stateMachine.canTransition(parentCall, CallState.ANSWERED)) {
+              this.stateMachine.answerCall(parentCall);
+            }
+          } else if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(status)) {
+            if (this.stateMachine.canTransition(parentCall, CallState.ENDED)) {
+              this.stateMachine.endCall(parentCall);
+            }
+          }
+          // Persist and emit update for parent
+          const updatedEntity = this.domainToEntity(parentCall);
+          await this.callRepository.save(updatedEntity);
+          this.callGateway.emitCallUpdate(parentCall);
+          this.logger?.log?.(`Updated parent call ${parentCall.id} via child leg ${callSid} status ${status}`);
+        } catch (err) {
+          if (err instanceof CallStateTransitionError) {
+            this.logger?.warn?.(`State transition failed for parent call ${parentCall.id}: ${err.message}`);
+          } else {
+            this.logger?.error?.('Error updating parent call', err?.stack || err?.message || err);
+            throw err;
+          }
+        }
+        return; // Don't process child as separate call
+      } else {
+        this.logger?.warn?.(`Parent call ${parentCallSid} not found for child leg ${callSid}`);
+        return;
+      }
+    }
 
     // Try to find by twilioSid first (outbound calls from us), then by id (inbound where id==CallSid)
-    let callEntity = await this.callRepository.findOneBy({ twilioSid: callSid } as any);
+    let callEntity = await this.callRepository.findOneBy({ externalId: callSid } as any);
     if (!callEntity) {
       callEntity = await this.callRepository.findOneBy({ id: callSid } as any);
     }
@@ -340,7 +464,7 @@ export class CallService {
     if (!callEntity && status === 'ringing' && (isInbound || twilioPayload.To?.includes(this.configService.get<string>('TWILIO_PHONE_NUMBER') || ''))) {
       const call = new Call(callSid, twilioPayload.From, twilioPayload.To, CallDirection.INBOUND);
       // Ensure both id and twilioSid are set for mapping
-      call.twilioSid = callSid;
+      call.externalId = callSid;
       try {
         this.stateMachine.startCall(call);
       } catch (err) {
@@ -362,8 +486,8 @@ export class CallService {
     // Map entity -> domain
     const call = this.entityToDomain(callEntity);
     // Persist missing twilioSid when possible
-    if (!call.twilioSid) {
-      call.twilioSid = callSid;
+    if (!call.externalId) {
+      call.externalId = callSid;
     }
 
     // Decide transition based on status
@@ -416,11 +540,14 @@ export class CallService {
     call.answeredAt = entity.answeredAt;
     call.endedAt = entity.endedAt;
     // Map external provider ID
-    if ((entity as any).twilioSid) {
-      call.twilioSid = (entity as any).twilioSid;
+    if (entity.externalId) {
+      call.externalId = entity.externalId;
     }
-    if ((entity as any).supervisorParticipantSid) {
-      call.supervisorParticipantSid = (entity as any).supervisorParticipantSid;
+    if (entity.parentCallSid) {
+      call.parentCallSid = entity.parentCallSid;
+    }
+    if (entity.providerMetadata) {
+      call.providerMetadata = entity.providerMetadata;
     }
     return call;
   }
@@ -437,11 +564,14 @@ export class CallService {
     entity.answeredAt = call.answeredAt;
     entity.endedAt = call.endedAt;
     // Persist external provider ID
-    if ((call as any).twilioSid) {
-      (entity as any).twilioSid = (call as any).twilioSid;
+    if (call.externalId) {
+      entity.externalId = call.externalId;
     }
-    if ((call as any).supervisorParticipantSid) {
-      (entity as any).supervisorParticipantSid = (call as any).supervisorParticipantSid;
+    if (call.parentCallSid) {
+      entity.parentCallSid = call.parentCallSid;
+    }
+    if (call.providerMetadata) {
+      entity.providerMetadata = call.providerMetadata;
     }
     return entity;
   }
@@ -457,7 +587,7 @@ export class CallService {
       startedAt: call.startedAt,
       answeredAt: call.answeredAt,
       endedAt: call.endedAt,
-      supervisorParticipantSid: call.supervisorParticipantSid,
+      supervisorParticipantSid: call.providerMetadata?.supervisorParticipantSid,
     };
   }
 }

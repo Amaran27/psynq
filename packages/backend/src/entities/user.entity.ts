@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
-import { AgentStatus } from '../auth/enums/agent-status.enum';
+import { AgentStatus } from '@psynq/core';
 
 export enum UserRole {
   AGENT = 'agent',

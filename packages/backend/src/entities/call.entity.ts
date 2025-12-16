@@ -1,5 +1,6 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { CallDirection, CallState } from '@psynq/core';
+import { CallParticipantEntity } from './call-participant.entity';
 
 @Entity('calls')
 export class CallEntity {
@@ -30,10 +31,13 @@ export class CallEntity {
   agentId?: string;
 
   @Column({ nullable: true })
-  twilioSid?: string;
+  externalId?: string;
 
   @Column({ nullable: true })
-  supervisorParticipantSid?: string;
+  parentCallSid?: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  providerMetadata?: Record<string, any>;
 
   @CreateDateColumn()
   startedAt: Date;
@@ -46,4 +50,7 @@ export class CallEntity {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => CallParticipantEntity, participant => participant.call)
+  participants: CallParticipantEntity[];
 }

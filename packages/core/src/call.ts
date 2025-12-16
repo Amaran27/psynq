@@ -19,9 +19,11 @@ export class Call {
 	to: string;
 	agentId?: string;
 	// External provider call ID (e.g., Twilio SID)
-	twilioSid?: string;
-	// External provider participant ID for an injected supervisor (e.g., Twilio Participant SID)
-	supervisorParticipantSid?: string;
+	externalId?: string;
+	// Provider specific metadata (e.g. supervisor participant SID)
+	providerMetadata?: Record<string, any>;
+	// Parent call SID for child legs (Twilio)
+	parentCallSid?: string;
 	startedAt?: Date;
 	answeredAt?: Date;
 	endedAt?: Date;

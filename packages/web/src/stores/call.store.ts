@@ -1,8 +1,8 @@
 import { create } from 'zustand';
-import { Call, CallState } from '@psynq/core';
+import { Call, CallState, TelephonyConnection } from '@psynq/core';
 import { TelephonyService } from '../services/telephony.service';
-import { Connection } from '@twilio/voice-sdk';
-import { useAdapterStore } from './adapter.store'; // Import the adapter store
+import { useAdapterStore } from './adapter.store';
+import { useAuthStore } from './auth.store'; // Import auth store
 
 interface CallStore {
   // State
@@ -11,11 +11,14 @@ interface CallStore {
   isLoading: boolean;
   error: string | null;
   telephonyService: TelephonyService | null;
-  incomingConnection: Connection | null;
+  incomingConnection: TelephonyConnection | null;
+  pollingInterval: NodeJS.Timeout | null;
 
   // Actions
   initializeTelephony: (agentId: string, authToken: string) => Promise<void>;
   loadActiveCalls: (authToken: string) => Promise<void>;
+  startPolling: (authToken: string) => void; // New action
+  stopPolling: () => void; // New action
   createCall: (from: string, to: string, authToken: string) => Promise<void>;
   answerCall: (callId: string, agentId: string, authToken: string) => Promise<void>;
   holdCall: (callId: string, authToken: string) => Promise<void>;
@@ -40,6 +43,7 @@ export const useCallStore = create<CallStore>((set, get) => ({
   error: null,
   telephonyService: null,
   incomingConnection: null,
+  pollingInterval: null as NodeJS.Timeout | null, // State for polling
 
   // Initialize Telephony Service
   initializeTelephony: async (agentId: string, authToken: string) => {
@@ -54,7 +58,7 @@ export const useCallStore = create<CallStore>((set, get) => ({
 
     // Register event handlers that interact with the store
     telephonyService.addEventListener('incoming', (e: Event) => {
-      const connection = (e as CustomEvent<{ connection: Connection }>).detail.connection;
+      const connection = (e as CustomEvent<{ connection: TelephonyConnection }>).detail.connection;
       const callSid = connection.parameters.CallSid;
       console.log(`Incoming call ${callSid} received in store.`);
       const call = get().calls.find(c => c.id === callSid);
@@ -65,8 +69,28 @@ export const useCallStore = create<CallStore>((set, get) => ({
       }
     });
 
-    telephonyService.addEventListener('disconnect', () => {
-      set({ currentCall: null, incomingConnection: null });
+    telephonyService.addEventListener('disconnect', (e: Event) => {
+      const connection = (e as CustomEvent<{ connection: TelephonyConnection }>).detail.connection;
+      const callSid = connection.parameters.CallSid;
+      console.log(`Call ${callSid} disconnected.`);
+      
+      // 1. Optimistically update UI
+      set(state => ({
+        currentCall: state.currentCall?.id === callSid ? null : state.currentCall,
+        incomingConnection: state.incomingConnection?.parameters.CallSid === callSid ? null : state.incomingConnection,
+        calls: state.calls.map(c => c.id === callSid ? { ...c, state: CallState.ENDED, endedAt: new Date() } : c)
+      }));
+
+      // 2. Notify backend to ensure DB is consistent (Fix for missing webhooks in dev)
+      const { apiAdapter } = useAdapterStore.getState();
+      const { token } = useAuthStore.getState();
+      
+      if (apiAdapter && token) {
+        console.log(`Notifying backend of disconnect for call ${callSid}`);
+        apiAdapter.endCall(callSid, token).catch(err => {
+          console.warn('Failed to notify backend of disconnect (call might already be ended):', err);
+        });
+      }
     });
 
     try {
@@ -86,7 +110,8 @@ export const useCallStore = create<CallStore>((set, get) => ({
       // This needs to be managed from a higher level, e.g., CallCenterContainer cleanup
     } catch (err) {
       console.error('Failed to initialize telephony service:', err);
-      set({ error: (err as Error).message });
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred during initialization';
+      set({ error: errorMessage });
     }
   },
 
@@ -98,15 +123,53 @@ export const useCallStore = create<CallStore>((set, get) => ({
       return;
     }
 
-    set({ isLoading: true, error: null });
+    // Don't set global loading state for background refreshes if we already have calls
+    if (get().calls.length === 0) {
+      set({ isLoading: true, error: null });
+    }
+    
     try {
       const calls = await apiAdapter.getActiveCalls(authToken);
-      set({ calls, isLoading: false });
+      
+      // Merge with existing state to preserve local UI state if needed
+      // For now, we just replace, but we check if currentCall is still valid
+      const currentCallId = get().currentCall?.id;
+      const stillActive = calls.find(c => c.id === currentCallId);
+      
+      set(state => ({ 
+        calls, 
+        isLoading: false,
+        // If current call is no longer in the active list, clear it (unless it's just created locally)
+        currentCall: currentCallId && !stillActive && state.currentCall?.state !== CallState.ENDED ? null : state.currentCall
+      }));
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to load calls',
         isLoading: false
       });
+    }
+  },
+
+  startPolling: (authToken: string) => {
+    const { pollingInterval } = get();
+    if (pollingInterval) return; // Already polling
+
+    console.log('Starting call status polling...');
+    const interval = setInterval(() => {
+      const { calls } = get();
+      if (calls.length > 0) {
+        get().loadActiveCalls(authToken);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    set({ pollingInterval: interval });
+  },
+
+  stopPolling: () => {
+    const { pollingInterval } = get();
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      set({ pollingInterval: null });
     }
   },
 
@@ -253,6 +316,20 @@ export const useCallStore = create<CallStore>((set, get) => ({
 
   // Add a new call (for real-time new calls)
   addCall: (newCall: Call) => {
+    // If this is a child leg, update the parent call instead of adding a new one
+    const parentCallSid = (newCall as any).parentCallSid;
+    if (parentCallSid) {
+      const parentCall = get().calls.find(c => c.externalId === parentCallSid || c.id === parentCallSid);
+      if (parentCall) {
+        // Update the parent call with the child's state
+        const updatedParent = { ...parentCall, state: newCall.state, answeredAt: newCall.answeredAt, endedAt: newCall.endedAt };
+        set(state => ({
+          calls: state.calls.map(c => c.id === parentCall.id ? updatedParent : c),
+          currentCall: state.currentCall?.id === parentCall.id ? updatedParent : state.currentCall,
+        }));
+        return;
+      }
+    }
     // If there's a pending incoming connection, match it to the new call
     const { incomingConnection } = get();
     if (incomingConnection && incomingConnection.parameters.CallSid === newCall.id) {

@@ -1,5 +1,4 @@
-import { Call } from '@psynq/core';
-import { AgentStatus } from '../../backend/src/auth/enums/agent-status.enum';
+import { Call, AgentStatus } from '@psynq/core';
 
 export interface CallApiPort {
   // Authentication
@@ -11,20 +10,20 @@ export interface CallApiPort {
   fetchAgentStatus(token: string): Promise<AgentStatus>;
 
   // Call CRUD operations
-  getActiveCalls(): Promise<Call[]>;
-  getCall(callId: string): Promise<Call>;
-  createCall(from: string, to: string): Promise<Call>;
+  getActiveCalls(token: string): Promise<Call[]>;
+  getCall(callId: string, token: string): Promise<Call>;
+  createCall(from: string, to: string, token: string): Promise<Call>;
 
   // Call actions
-  answerCall(callId: string, agentId: string): Promise<Call>;
-  holdCall(callId: string): Promise<Call>;
-  resumeCall(callId: string): Promise<Call>;
-  endCall(callId: string): Promise<Call>;
+  answerCall(callId: string, agentId: string, token: string): Promise<Call>;
+  holdCall(callId: string, token: string): Promise<Call>;
+  resumeCall(callId: string, token: string): Promise<Call>;
+  endCall(callId: string, token: string): Promise<Call>;
 
   // Telephony device actions
-  getTelephonyToken(agentId: string): Promise<string>;
+  getTelephonyToken(agentId: string, token: string): Promise<string>;
 
   // Real-time subscriptions
-  subscribeToCallUpdates(callback: (call: Call) => void): () => void;
-  subscribeToNewCalls(callback: (call: Call) => void): () => void;
+  subscribeToCallUpdates(callback: (call: Call) => void, token: string): () => void;
+  subscribeToNewCalls(callback: (call: Call) => void, token: string): () => void;
 }

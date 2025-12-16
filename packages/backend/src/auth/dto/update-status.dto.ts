@@ -1,5 +1,5 @@
 import { IsEnum } from 'class-validator';
-import { AgentStatus } from '../enums/agent-status.enum';
+import { AgentStatus } from '@psynq/core';
 
 export class UpdateStatusDto {
   @IsEnum(AgentStatus)

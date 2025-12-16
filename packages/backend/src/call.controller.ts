@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Body, Param, NotFoundException, UseGuards }
 import { CallService } from './services/call.service';
 import { CreateCallDto, CallResponseDto, CallActionDto } from './dtos/call.dto';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { SupervisorControlOptions, CallParticipant } from './interfaces/call-participant.interface';
 
 @Controller('calls')
 @UseGuards(JwtAuthGuard)
@@ -71,8 +72,11 @@ export class CallController {
    * Inject a supervisor (muted by default)
    */
   @Post(':id/supervisor/inject')
-  async injectSupervisor(@Param('id') callId: string, @Body() body: { supervisorId: string }): Promise<CallResponseDto> {
-    return await this.callService.injectSupervisor(callId, body.supervisorId);
+  async injectSupervisor(
+    @Param('id') callId: string, 
+    @Body() body: { supervisorId: string; options?: SupervisorControlOptions }
+  ): Promise<CallParticipant> {
+    return await this.callService.injectSupervisor(callId, body.supervisorId, body.options);
   }
 
   /**

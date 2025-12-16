@@ -1,4 +1,8 @@
-import { Call, CallState } from '@psynq/core';
+import { Call, CallState, AgentStatus } from '@psynq/core';
+import { AgentStatusSelector } from './AgentStatusSelector';
+import { useEffect } from 'react';
+import { useCallStore } from '../stores/call.store';
+import { useAuthStore } from '../stores/auth.store';
 
 interface CallStats {
   activeCalls: number;
@@ -13,6 +17,9 @@ interface CallCenterViewProps {
   isLoading: boolean;
   error: string | null;
   stats: CallStats;
+  agentStatus: AgentStatus;
+  onUpdateAgentStatus: (status: AgentStatus) => void;
+  onLogout: () => void;
   onCreateCall: (to: string) => void;
   onAnswerCall: (callId: string) => void;
   onHoldCall: (callId: string) => void;
@@ -54,6 +61,9 @@ export function CallCenterView({
   isLoading,
   error,
   stats,
+  agentStatus,
+  onUpdateAgentStatus,
+  onLogout,
   onCreateCall,
   onAnswerCall,
   onHoldCall,
@@ -61,6 +71,21 @@ export function CallCenterView({
   onEndCall,
   onSelectCall,
 }: CallCenterViewProps) {
+  useEffect(() => {
+    if (calls.length > 0) {
+      const { token } = useAuthStore.getState();
+      if (token) {
+        useCallStore.getState().startPolling(token);
+      }
+    } else {
+      useCallStore.getState().stopPolling();
+    }
+    
+    return () => {
+      useCallStore.getState().stopPolling();
+    };
+  }, [calls.length]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -69,10 +94,21 @@ export function CallCenterView({
           <div className="flex justify-between items-center py-4">
             <h1 className="text-2xl font-bold text-gray-900">Psynq Call Center</h1>
             <div className="flex items-center space-x-4">
+              <AgentStatusSelector
+                currentStatus={agentStatus}
+                onStatusChange={onUpdateAgentStatus}
+                isLoading={isLoading}
+              />
               <span className="text-sm text-gray-600">Agent: John Doe</span>
               <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-sm font-medium">JD</span>
               </div>
+              <button
+                onClick={onLogout}
+                className="text-sm text-red-600 hover:text-red-800 font-medium"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -95,7 +131,16 @@ export function CallCenterView({
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Active Calls</h3>
+            <div className="flex justify-between items-start">
+              <h3 className="text-sm font-medium text-gray-500">Active Calls</h3>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="text-xs text-blue-600 hover:text-blue-800"
+                title="Refresh Page"
+              >
+                Refresh
+              </button>
+            </div>
             <p className="text-3xl font-bold text-gray-900">{stats.activeCalls}</p>
             {isLoading && <div className="mt-2 text-xs text-gray-500">Loading...</div>}
           </div>
@@ -167,6 +212,15 @@ export function CallCenterView({
                     className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-colors"
                   >
                     Answer Call
+                  </button>
+                )}
+                {currentCall.state === CallState.RINGING && (
+                  <button
+                    onClick={() => onEndCall(currentCall.id)}
+                    disabled={isLoading}
+                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+                  >
+                    End Call
                   </button>
                 )}
                 {currentCall.state === CallState.ANSWERED && (
@@ -262,6 +316,17 @@ export function CallCenterView({
                                 className="text-green-600 hover:text-green-900"
                               >
                                 Answer
+                              </button>
+                            )}
+                            {call.state === CallState.RINGING && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEndCall(call.id);
+                                }}
+                                className="text-red-600 hover:text-red-900 ml-2"
+                              >
+                                End
                               </button>
                             )}
                             {call.state === CallState.ANSWERED && (

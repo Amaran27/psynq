@@ -24,6 +24,16 @@ export class InfobipAdapter implements TelephonyPort {
   private readonly baseUrl: string;
   private readonly apiKey: string;
 
+  getCapabilities(): import('../interfaces/telephony-capabilities.interface').TelephonyCapabilities {
+    return {
+      supportsSupervisorInjection: false,
+      supportsParticipantMute: false,
+      supportsParticipantHold: false,
+      supportsBridgeCall: true, // we can emulate bridging via new outbound calls
+      supportsTransfer: false
+    };
+  }
+
   constructor() {
     let baseUrl = process.env.INFOBIP_BASE_URL || 'https://api.infobip.com';
     
@@ -108,10 +118,19 @@ export class InfobipAdapter implements TelephonyPort {
     // For now, we'll log and continue
   }
 
-  async injectSupervisor(callId: string, supervisorId: string): Promise<void> {
+  async injectSupervisor(callId: string, supervisorId: string, options?: any): Promise<any> {
     this.logger.log(`Injecting supervisor ${supervisorId} into call ${callId} via Infobip`);
     // Infobip supervisor injection implementation would go here
     // For now, we'll log and continue
+    return undefined;
+  }
+
+  async setParticipantMuted(participantId: string, muted: boolean): Promise<void> {
+    this.logger.warn('setParticipantMuted not implemented for Infobip');
+  }
+
+  async setParticipantOnHold(participantId: string, onHold: boolean): Promise<void> {
+    this.logger.warn('setParticipantOnHold not implemented for Infobip');
   }
 
   async endCall(callId: string): Promise<void> {

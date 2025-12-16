@@ -1,24 +1,26 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CallEntity } from '../entities/call.entity';
+import { CallParticipantEntity } from '../entities/call-participant.entity';
 import { ConfigModule } from '@nestjs/config';
 import { CallService } from '../services/call.service';
+import { CallParticipantService } from '../services/call-participant.service';
 import { CallController } from '../call.controller';
 import { CallGateway } from '../call.gateway';
 import { TwilioAdapter } from '../adapters/twilio.adapter';
-import { InfobipAdapter } from '../telephony/infobip.adapter';
+import { InfobipAdapter } from '../adapters/infobip.adapter';
 import { AuthModule } from '../auth/auth.module';
 import { TwilioModule } from '../twilio/twilio.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([CallEntity]),
+    TypeOrmModule.forFeature([CallEntity, CallParticipantEntity]),
     ConfigModule,
     forwardRef(() => AuthModule),
     TwilioModule,
   ],
   controllers: [CallController],
-  providers: [CallService, CallGateway, TwilioAdapter, InfobipAdapter],
+  providers: [CallService, CallParticipantService, CallGateway, TwilioAdapter, InfobipAdapter],
   exports: [CallService],
 })
 export class CallModule {}

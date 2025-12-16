@@ -8,12 +8,16 @@ import { TwilioModule } from './twilio/twilio.module';
 import { WebhookController } from './webhooks/webhook.controller';
 import { CallEntity } from './entities/call.entity';
 import { UserEntity } from './entities/user.entity';
+import { CallParticipantEntity } from './entities/call-participant.entity';
 import { AuthModule } from './auth/auth.module';
 import { CallModule } from './call/call.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+      envFilePath: ['.env', '../../.env'], // Look in current dir and root dir
+      isGlobal: true,
+    }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
@@ -21,7 +25,7 @@ import { CallModule } from './call/call.module';
       username: process.env.DB_USER || 'psynq_user',
       password: process.env.DB_PASSWORD || 'mysecretpassword',
       database: process.env.DB_NAME || 'psynq_db',
-      entities: [CallEntity, UserEntity],
+      entities: [CallEntity, UserEntity, CallParticipantEntity],
       // In development we keep synchronize for convenience; in production it must be disabled.
       synchronize: process.env.NODE_ENV !== 'production',
       migrations: [__dirname + '/migrations/*.{ts,js}'],

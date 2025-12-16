@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { CallApiPort } from '../ports/call-api.port';
-import { AgentStatus } from '../../backend/src/auth/enums/agent-status.enum'; // Adjust path as needed
+import { AgentStatus } from '@psynq/core';
 
 interface AuthState {
   isLoggedIn: boolean;

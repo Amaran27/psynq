@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TelephonyPort } from '../ports/telephony.port';
 import { Call } from '@psynq/core';
+import { CallParticipant, SupervisorControlOptions } from '../interfaces/call-participant.interface';
 import twilio from 'twilio';
 
 @Injectable()
@@ -10,6 +11,16 @@ export class TwilioAdapter implements TelephonyPort {
   private client: twilio.Twilio | null;
   private onCallReceived: ((call: Call) => void) | null = null;
   private onCallEnded: ((callId: string) => void) | null = null;
+
+  getCapabilities(): import('../interfaces/telephony-capabilities.interface').TelephonyCapabilities {
+    return {
+      supportsSupervisorInjection: true,
+      supportsParticipantMute: true,
+      supportsParticipantHold: true,
+      supportsBridgeCall: true,
+      supportsTransfer: true
+    };
+  }
 
   constructor(private configService: ConfigService) {
     const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID') || process.env.TWILIO_ACCOUNT_SID;
@@ -57,10 +68,16 @@ export class TwilioAdapter implements TelephonyPort {
       // named after our internal call ID (which should be the Twilio Call SID).
       const twiml = `<Response><Dial><Conference>${call.id}</Conference></Dial></Response>`;
 
+      const backendUrl = this.configService.get<string>('BACKEND_URL');
+      const statusCallback = backendUrl ? `${backendUrl}/webhooks/twilio/voice` : undefined;
+
       const created = await this.client.calls.create({
         to: call.to,
         from: fromNumber,
         twiml: twiml,
+        statusCallback: statusCallback,
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+        statusCallbackMethod: 'POST',
       });
 
       console.log(`Outbound call initiated to ${call.to} and placed in conference ${call.id} — Twilio SID: ${created.sid}`);
@@ -117,8 +134,15 @@ export class TwilioAdapter implements TelephonyPort {
       // Placeholder: Implement via Twilio API if needed
     */
   }
+  
+  /**
+   * Generates a unique participant ID for tracking
+   */
+  private generateParticipantId(): string {
+    return `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
 
-  async injectSupervisor(callId: string, supervisorId: string): Promise<string | void> {
+  async injectSupervisor(callId: string, supervisorId: string, options?: SupervisorControlOptions): Promise<CallParticipant | void> {
     if (!this.client) {
       console.warn('Twilio client not configured — injectSupervisor will no-op.');
       return undefined;
@@ -140,33 +164,83 @@ export class TwilioAdapter implements TelephonyPort {
       const participant = await this.client.conferences(conferenceName).participants.create({
         from: fromNumber,
         to: toTarget,
-        muted: true,
+        muted: options?.initialMuteState !== false, // Default to muted (whisper mode)
         startConferenceOnEnter: true,
       });
 
       // Twilio's participant resource may expose different fields depending on the SDK version.
       const participantSid = (participant as any).callSid || (participant as any).sid || (participant as any).participantSid;
+      
+      // Create a CallParticipant object to return
+      const callParticipant: CallParticipant = {
+        id: this.generateParticipantId(),
+        callId,
+        participantId: supervisorId,
+        participantType: 'supervisor',
+        providerCallSid: participantSid,
+        providerSpecificData: {
+          conferenceName,
+          twilioParticipantSid: participantSid
+        },
+        isMuted: options?.initialMuteState !== false, // Default to muted (whisper mode)
+        isOnHold: false,
+        joinedAt: new Date()
+      };
+      
       this.logger?.log?.(`Supervisor injected with participant SID ${participantSid}`);
-      return participantSid;
+      return callParticipant;
     } catch (error) {
       this.logger?.error?.(`Failed to inject supervisor into call ${callId}: ${error?.message || error}`);
       throw error;
     }
   }
 
-  async setParticipantMuted(callId: string, participantSid: string, muted: boolean): Promise<void> {
+  async setParticipantMuted(participantId: string, muted: boolean): Promise<void> {
     if (!this.client) {
       console.warn('Twilio client not configured — setParticipantMuted will no-op.');
       return;
     }
 
-    const conferenceName = `conf_${callId}`;
     try {
-      this.logger?.log?.(`Setting participant ${participantSid} muted=${muted} in conference ${conferenceName}`);
-      await this.client.conferences(conferenceName).participants(participantSid).update({ muted });
-      this.logger?.log?.(`Participant ${participantSid} updated (muted=${muted})`);
+      this.logger?.log?.(`Setting participant ${participantId} muted=${muted}`);
+      
+      // For Twilio, we need to extract the conference name and participant SID from the participantId
+      // In a real implementation, we would look up the participant in our database to get this info
+      // For now, we'll assume the participantId is in the format "conferenceName:participantSid"
+      const [conferenceName, participantSid] = participantId.split(':');
+      
+      if (conferenceName && participantSid) {
+        await this.client.conferences(conferenceName).participants(participantSid).update({ muted });
+        this.logger?.log?.(`Participant ${participantSid} updated (muted=${muted})`);
+      } else {
+        throw new Error(`Invalid participantId format: ${participantId}. Expected format: conferenceName:participantSid`);
+      }
     } catch (error) {
-      this.logger?.error?.(`Failed to update participant ${participantSid} in call ${callId}: ${error?.message || error}`);
+      this.logger?.error?.(`Failed to update participant ${participantId}: ${error?.message || error}`);
+      throw error;
+    }
+  }
+  
+  async setParticipantOnHold(participantId: string, onHold: boolean): Promise<void> {
+    if (!this.client) {
+      console.warn('Twilio client not configured — setParticipantOnHold will no-op.');
+      return;
+    }
+
+    try {
+      this.logger?.log?.(`Setting participant ${participantId} onHold=${onHold}`);
+      
+      // For Twilio, we need to extract the conference name and participant SID from the participantId
+      const [conferenceName, participantSid] = participantId.split(':');
+      
+      if (conferenceName && participantSid) {
+        await this.client.conferences(conferenceName).participants(participantSid).update({ hold: onHold });
+        this.logger?.log?.(`Participant ${participantSid} updated (onHold=${onHold})`);
+      } else {
+        throw new Error(`Invalid participantId format: ${participantId}. Expected format: conferenceName:participantSid`);
+      }
+    } catch (error) {
+      this.logger?.error?.(`Failed to update participant ${participantId}: ${error?.message || error}`);
       throw error;
     }
   }

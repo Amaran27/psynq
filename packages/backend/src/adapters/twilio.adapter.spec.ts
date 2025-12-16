@@ -50,7 +50,7 @@ describe('TwilioAdapter.bridgeCall', () => {
     await expect(adapter.injectSupervisor('ANY', 'supervisor')).resolves.toBeUndefined();
   });
 
-  test('injectSupervisor creates participant and returns participantSid', async () => {
+  test('injectSupervisor creates participant and returns CallParticipant', async () => {
     const adapter = new TwilioAdapter(mockConfig() as any);
     const participantCreateMock = jest.fn().mockResolvedValue({ sid: 'PARTICIPANT_SID' });
     const participantsFn: any = jest.fn().mockImplementation(() => ({ create: participantCreateMock }));
@@ -58,44 +58,53 @@ describe('TwilioAdapter.bridgeCall', () => {
 
     (adapter as any).client = { conferences: conferencesFn } as any;
 
-    const sid = await adapter.injectSupervisor('CALL123', 'supervisor1');
+    const participant = await adapter.injectSupervisor('CALL123', 'supervisor1');
 
     expect(conferencesFn).toHaveBeenCalledWith('conf_CALL123');
     expect(participantCreateMock).toHaveBeenCalledWith(expect.objectContaining({ to: 'client:supervisor1' }));
-    expect(sid).toBe('PARTICIPANT_SID');
+    expect(participant).toEqual({
+      id: expect.stringMatching(/^participant_\d+_[a-z0-9]+$/),
+      callId: 'CALL123',
+      participantId: 'supervisor1',
+      participantType: 'supervisor',
+      providerCallSid: 'PARTICIPANT_SID',
+      isMuted: true, // Supervisors are muted by default in Twilio
+      isOnHold: false,
+      joinedAt: expect.any(Date),
+      providerSpecificData: {
+        conferenceName: 'conf_CALL123',
+        twilioParticipantSid: 'PARTICIPANT_SID'
+      }
+    });
   });
 
   test('setParticipantMuted calls Twilio API to mute participant', async () => {
     const adapter = new TwilioAdapter(mockConfig() as any);
     const updateParticipantMock = jest.fn().mockResolvedValue({ sid: 'PARTICIPANT_SID', muted: true });
-    const participantResource = jest.fn().mockImplementation((sid) => ({ update: updateParticipantMock }));
-    const participantsList = jest.fn().mockReturnValue(participantResource);
-    const conferencesResource = jest.fn().mockImplementation((name) => ({ participants: participantsList }));
+    const participantsResource = jest.fn().mockImplementation((sid) => ({ update: updateParticipantMock }));
+    const conferencesResource = jest.fn().mockImplementation((name) => ({ participants: participantsResource }));
 
     (adapter as any).client = { conferences: conferencesResource } as any;
 
-    await adapter.setParticipantMuted('CALL123', 'PARTICIPANT_SID', true);
+    await adapter.setParticipantMuted('conf_CALL123:PARTICIPANT_SID', true);
 
     expect(conferencesResource).toHaveBeenCalledWith('conf_CALL123');
-    expect(participantsList).toHaveBeenCalled();
-    expect(participantResource).toHaveBeenCalledWith('PARTICIPANT_SID');
+    expect(participantsResource).toHaveBeenCalledWith('PARTICIPANT_SID');
     expect(updateParticipantMock).toHaveBeenCalledWith({ muted: true });
   });
 
   test('setParticipantMuted calls Twilio API to unmute participant', async () => {
     const adapter = new TwilioAdapter(mockConfig() as any);
     const updateParticipantMock = jest.fn().mockResolvedValue({ sid: 'PARTICIPANT_SID', muted: false });
-    const participantResource = jest.fn().mockImplementation((sid) => ({ update: updateParticipantMock }));
-    const participantsList = jest.fn().mockReturnValue(participantResource);
-    const conferencesResource = jest.fn().mockImplementation((name) => ({ participants: participantsList }));
+    const participantsResource = jest.fn().mockImplementation((sid) => ({ update: updateParticipantMock }));
+    const conferencesResource = jest.fn().mockImplementation((name) => ({ participants: participantsResource }));
 
     (adapter as any).client = { conferences: conferencesResource } as any;
 
-    await adapter.setParticipantMuted('CALL123', 'PARTICIPANT_SID', false);
+    await adapter.setParticipantMuted('conf_CALL123:PARTICIPANT_SID', false);
 
     expect(conferencesResource).toHaveBeenCalledWith('conf_CALL123');
-    expect(participantsList).toHaveBeenCalled();
-    expect(participantResource).toHaveBeenCalledWith('PARTICIPANT_SID');
+    expect(participantsResource).toHaveBeenCalledWith('PARTICIPANT_SID');
     expect(updateParticipantMock).toHaveBeenCalledWith({ muted: false });
   });
 
@@ -103,6 +112,6 @@ describe('TwilioAdapter.bridgeCall', () => {
     const adapter = new TwilioAdapter(mockConfig() as any);
     (adapter as any).client = null;
 
-    await expect(adapter.setParticipantMuted('ANY', 'PART', true)).resolves.not.toThrow();
+    await expect(adapter.setParticipantMuted('conf_ANY:PART', true)).resolves.not.toThrow();
   });
 });

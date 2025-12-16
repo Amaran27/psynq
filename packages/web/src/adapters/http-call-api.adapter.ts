@@ -1,7 +1,7 @@
 import { Call } from '@psynq/core';
 import { io, Socket } from 'socket.io-client';
 import { CallApiPort } from '../ports/call-api.port';
-import { AgentStatus } from '../../backend/src/auth/enums/agent-status.enum'; // Import the enum
+import { AgentStatus } from '@psynq/core';
 import { jwtDecode } from 'jwt-decode'; // Import jwtDecode
 
 export class HttpCallApiAdapter implements CallApiPort {
@@ -162,7 +162,8 @@ export class HttpCallApiAdapter implements CallApiPort {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch telephony token');
+      console.error('Telephony token fetch failed:', error);
+      throw new Error(error.message || error.error || 'Failed to fetch telephony token');
     }
 
     const { token: twilioToken } = await response.json();
@@ -171,28 +172,55 @@ export class HttpCallApiAdapter implements CallApiPort {
 
   // Update subscribe methods to include token if needed for authenticated WebSockets
   // For now, assuming socket.io client handles token through handshake or custom headers.
-  subscribeToCallUpdates(callback: (call: Call) => void, token: string): () => void {
-    if (this.socket) {
-      this.socket.disconnect(); // Disconnect existing socket if any
+  // Ensure a single socket instance is used and created with the auth token
+  private ensureSocket(token: string) {
+    if (this.socket && this.socket.connected) return this.socket;
+
+    // If an existing socket exists but is using a different token, disconnect and recreate
+    if (this.socket && !this.socket.disconnected) {
+      this.socket.disconnect();
+      this.socket = null;
     }
-    this.socket = io(this.baseUrl.replace('http', 'ws'), {
-      extraHeaders: {
-        Authorization: `Bearer ${token}`,
-      },
+
+    this.socket = io(this.baseUrl, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
     });
-    this.socket.on('callUpdate', callback);
-    return () => this.socket?.disconnect();
+
+    this.socket.on('connect', () => {
+      console.log('WebSocket connected');
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.error('WebSocket connection error:', err);
+    });
+
+    // Register both events once
+    this.socket.on('callUpdate', (call) => {
+      console.log('Received call update via WebSocket:', call);
+      // emit an internal event that callers can attach to via callbacks
+      // actual callback handling happens in subscribe methods below
+    });
+
+    this.socket.on('newCall', (call) => {
+      console.log('Received new call via WebSocket:', call);
+    });
+
+    return this.socket;
+  }
+
+  subscribeToCallUpdates(callback: (call: Call) => void, token: string): () => void {
+    const socket = this.ensureSocket(token);
+    // Register the user's callback
+    const handler = (call: Call) => callback(call);
+    socket.on('callUpdate', handler);
+    return () => socket.off('callUpdate', handler);
   }
 
   subscribeToNewCalls(callback: (call: Call) => void, token: string): () => void {
-    if (!this.socket) { // Ensure socket is created if subscribeToCallUpdates wasn't called first
-      this.socket = io(this.baseUrl.replace('http', 'ws'), {
-        extraHeaders: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    }
-    this.socket.on('newCall', callback);
-    return () => this.socket?.disconnect();
+    const socket = this.ensureSocket(token);
+    const handler = (call: Call) => callback(call);
+    socket.on('newCall', handler);
+    return () => socket.off('newCall', handler);
   }
 }
