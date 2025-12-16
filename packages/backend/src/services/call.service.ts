@@ -363,6 +363,15 @@ export class CallService {
       }
       
       this.callGateway.emitCallUpdate(call);
+
+      // When a call is ended via API, also reconcile any related active calls so the UI
+      // doesn't show duplicates (e.g. child/inbound leg still in RINGING).
+      try {
+        await this.cleanupRelatedActiveCalls(call);
+      } catch (cleanupErr) {
+        this.logger?.warn?.(`Cleanup of related calls failed for call ${call.id}: ${cleanupErr?.message || cleanupErr}`);
+      }
+
       return this.mapToResponseDto(call);
     } catch (error) {
       if (error instanceof CallStateTransitionError) throw new BadRequestException(`Cannot end call: ${error.message}`);
@@ -439,6 +448,15 @@ export class CallService {
           await this.callRepository.save(updatedEntity);
           this.callGateway.emitCallUpdate(parentCall);
           this.logger?.log?.(`Updated parent call ${parentCall.id} via child leg ${callSid} status ${status}`);
+
+          // If child reported an end state, ensure related active calls are reconciled (ended)
+          if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(status)) {
+            try {
+              await this.cleanupRelatedActiveCalls(parentCall);
+            } catch (cleanupErr) {
+              this.logger?.warn?.(`Cleanup of related calls failed for parent ${parentCall.id}: ${cleanupErr?.message || cleanupErr}`);
+            }
+          }
         } catch (err) {
           if (err instanceof CallStateTransitionError) {
             this.logger?.warn?.(`State transition failed for parent call ${parentCall.id}: ${err.message}`);
@@ -461,7 +479,25 @@ export class CallService {
     }
 
     // If call does not exist and Twilio reports a new inbound ringing call, create it.
+    // But first, check if this might be a child leg for an existing outbound call to the same number
     if (!callEntity && status === 'ringing' && (isInbound || twilioPayload.To?.includes(this.configService.get<string>('TWILIO_PHONE_NUMBER') || ''))) {
+      const existingOutbound = await this.callRepository.findOne({
+        where: {
+          direction: CallDirection.OUTBOUND,
+          to: twilioPayload.To,
+          state: Not(CallState.ENDED)
+        }
+      });
+      if (existingOutbound) {
+        // Update the existing outbound call instead of creating new inbound
+        const call = this.entityToDomain(existingOutbound);
+        // Already ringing, but perhaps transition if needed
+        await this.callRepository.save(this.domainToEntity(call));
+        this.callGateway.emitCallUpdate(call);
+        this.logger?.log?.(`Updated existing outbound call ${call.id} for potential child leg ringing`);
+        return;
+      }
+
       const call = new Call(callSid, twilioPayload.From, twilioPayload.To, CallDirection.INBOUND);
       // Ensure both id and twilioSid are set for mapping
       call.externalId = callSid;
@@ -513,6 +549,15 @@ export class CallService {
       const updatedEntity = this.domainToEntity(call);
       await this.callRepository.save(updatedEntity);
       this.callGateway.emitCallUpdate(call);
+
+      // If this call ended, try to reconcile and end any related active calls
+      if (call.state === CallState.ENDED) {
+        try {
+          await this.cleanupRelatedActiveCalls(call);
+        } catch (cleanupErr) {
+          this.logger?.warn?.(`Cleanup of related calls failed for call ${call.id}: ${cleanupErr?.message || cleanupErr}`);
+        }
+      }
     } catch (err) {
       if (err instanceof CallStateTransitionError) {
         // Idempotency: if transition not allowed, just log and ignore
@@ -574,6 +619,37 @@ export class CallService {
       entity.providerMetadata = call.providerMetadata;
     }
     return entity;
+  }
+
+  private async cleanupRelatedActiveCalls(call: Call) {
+    // Find other active calls with the same endpoints or explicit parent linkage
+    const relatedEntities = await this.callRepository.find({
+      where: [
+        { to: call.to, from: call.from, state: Not(CallState.ENDED) },
+        { to: call.from, from: call.to, state: Not(CallState.ENDED) },
+        { parentCallSid: call.externalId, state: Not(CallState.ENDED) },
+        { parentCallSid: call.id, state: Not(CallState.ENDED) }
+      ]
+    });
+
+    for (const entity of relatedEntities) {
+      if (entity.id === call.id) continue;
+      const relatedCall = this.entityToDomain(entity);
+      try {
+        if (this.stateMachine.canTransition(relatedCall, CallState.ENDED)) {
+          this.stateMachine.endCall(relatedCall);
+        } else {
+          // Force end if state machine cannot transition (last resort)
+          relatedCall.state = CallState.ENDED;
+          relatedCall.endedAt = new Date();
+        }
+        await this.callRepository.save(this.domainToEntity(relatedCall));
+        this.callGateway.emitCallUpdate(relatedCall);
+        this.logger?.log?.(`Ended related call ${relatedCall.id} because ${call.id} transitioned to ENDED`);
+      } catch (err) {
+        this.logger?.warn?.(`Failed to end related call ${relatedCall.id}: ${err?.message || err}`);
+      }
+    }
   }
 
   private mapToResponseDto(call: Call): CallResponseDto {
