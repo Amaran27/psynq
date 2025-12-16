@@ -1,0 +1,58 @@
+name: Migrations & Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  migrations-and-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: psynq_db
+          POSTGRES_USER: psynq_user
+          POSTGRES_PASSWORD: mysecretpassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U psynq_user -d psynq_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USER: psynq_user
+      DB_PASSWORD: mysecretpassword
+      DB_NAME: psynq_db
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER && break || sleep 1
+          done
+
+      - name: Check for model/migration drift
+        run: npm run migration:check
+
+      - name: Run migrations
+        run: npm run migration:run
+
+      - name: Run tests
+        run: npm test --silent

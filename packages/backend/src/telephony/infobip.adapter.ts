@@ -35,8 +35,13 @@ export class InfobipAdapter implements TelephonyPort {
     this.baseUrl = baseUrl;
     this.apiKey = process.env.INFOBIP_API_KEY || '';
     
+    // Previously we threw an error during construction if API key was missing:
+    // if (!this.apiKey) {
+    //   throw new Error('INFOBIP_API_KEY environment variable is required');
+    // }
+    // For dev/test runs we prefer the server to start even if Infobip is not configured.
     if (!this.apiKey) {
-      throw new Error('INFOBIP_API_KEY environment variable is required');
+      this.logger.warn('INFOBIP_API_KEY is not set. InfobipAdapter will not perform real API calls.');
     }
   }
 

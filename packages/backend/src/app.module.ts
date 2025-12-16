@@ -16,13 +16,17 @@ import { CallModule } from './call/call.module';
     ConfigModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'psynq_user',
-      password: 'mysecretpassword',
-      database: 'psynq_db',
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      username: process.env.DB_USER || 'psynq_user',
+      password: process.env.DB_PASSWORD || 'mysecretpassword',
+      database: process.env.DB_NAME || 'psynq_db',
       entities: [CallEntity, UserEntity],
-      synchronize: true,
+      // In development we keep synchronize for convenience; in production it must be disabled.
+      synchronize: process.env.NODE_ENV !== 'production',
+      migrations: [__dirname + '/migrations/*.{ts,js}'],
+      // Control whether to auto-run migrations on startup via explicit env var. Default: do NOT auto-run in production.
+      migrationsRun: process.env.RUN_MIGRATIONS_ON_START === 'true',
     }),
     TypeOrmModule.forFeature([UserEntity]), // CallEntity is in CallModule
     TwilioModule,

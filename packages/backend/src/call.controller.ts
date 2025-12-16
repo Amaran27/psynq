@@ -66,4 +66,28 @@ export class CallController {
   async endCall(@Param('id') callId: string): Promise<CallResponseDto> {
     return await this.callService.endCall(callId);
   }
+
+  /**
+   * Inject a supervisor (muted by default)
+   */
+  @Post(':id/supervisor/inject')
+  async injectSupervisor(@Param('id') callId: string, @Body() body: { supervisorId: string }): Promise<CallResponseDto> {
+    return await this.callService.injectSupervisor(callId, body.supervisorId);
+  }
+
+  /**
+   * Unmute (barge-in) the supervisor so they can speak
+   */
+  @Post(':id/supervisor/unmute')
+  async supervisorUnmute(@Param('id') callId: string): Promise<CallResponseDto> {
+    return await this.callService.supervisorUnmute(callId);
+  }
+
+  /**
+   * Mute the supervisor (whisper)
+   */
+  @Post(':id/supervisor/mute')
+  async supervisorMute(@Param('id') callId: string): Promise<CallResponseDto> {
+    return await this.callService.supervisorMute(callId);
+  }
 }

@@ -32,6 +32,9 @@ export class CallEntity {
   @Column({ nullable: true })
   twilioSid?: string;
 
+  @Column({ nullable: true })
+  supervisorParticipantSid?: string;
+
   @CreateDateColumn()
   startedAt: Date;
 

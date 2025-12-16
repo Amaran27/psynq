@@ -386,6 +386,36 @@ These may be introduced in later phases without impacting customer‑facing APIs
 
 ---
 
+## 16. Database Migrations (Developer Guide)
+
+Migrations are versioned SQL changes applied to the production database to evolve schema safely.
+
+### Commands
+- Run migrations: `npm run migration:run`
+- Revert last migration: `npm run migration:revert`
+- Generate a migration (local): `npm run migration:generate`
+
+> The project uses a `DataSource` (`src/data-source.ts`) referenced by the TypeORM CLI. Set DB connection env vars (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME) before running migration commands.
+
+### Best practices (strict supervisor rules)
+- Always run migrations in staging first and verify application behavior.
+- Ensure backups or snapshots exist before applying to production environments.
+- Migrations should be small, reversible, and tested in CI.
+- Don’t rely on `synchronize: true` in production; it is only enabled for local/dev runs.
+
+### Verification
+- After running: `SELECT column_name FROM information_schema.columns WHERE table_name='calls';`
+- Check the new column: `SELECT id, supervisorParticipantSid FROM calls LIMIT 10;`
+
+### CI migration drift check
+To avoid missing migrations when entities change, CI runs a lightweight check that attempts to generate a migration in a temporary (DRIFT_CHECK) name and fails the job if a migration would be generated but is not committed.
+
+- Run locally: `npm run migration:check`
+- CI behavior: step fails when model/schema drift is detected and instructs the developer to generate and commit a migration.
+- This prevents accidental merges that change the database schema without a corresponding migration file.
+
+---
+
 ## 15. Open-Source Components and Licensing
 
 ### Approved Open-Source Stack

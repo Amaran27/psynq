@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 import { Call, CallState, CallStateMachine, CallStateTransitionError, CallDirection } from '@psynq/core';
@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CallService {
+  private readonly logger = new Logger(CallService.name);
   private stateMachine = new CallStateMachine();
 
   constructor(
@@ -148,6 +149,83 @@ export class CallService {
   }
 
   /**
+   * Injects a supervisor into an active call (whisper/barge-in support).
+   * Persists the external participant identifier returned by the provider.
+   */
+  async injectSupervisor(callId: string, supervisorId: string): Promise<CallResponseDto> {
+    const callEntity = await this.findCallEntityOrFail(callId);
+    const call = this.entityToDomain(callEntity);
+
+    // Use provider-specific implementation to inject the supervisor and obtain a participant SID
+    const provider = this.selectProvider(call.to);
+    let participantSid: string | undefined;
+    if (provider === 'infobip') {
+      // Infobip adapter does not yet implement supervisor injection; log and throw
+      this.logger?.warn?.('Infobip supervisor injection not implemented');
+      throw new BadRequestException('Supervisor injection is not supported for Infobip at this time');
+    } else {
+      const externalId = call.twilioSid || callId;
+      participantSid = await this.twilioAdapter.injectSupervisor(externalId, supervisorId) as string | undefined;
+    }
+
+    if (participantSid) {
+      call.supervisorParticipantSid = participantSid;
+      await this.callRepository.save(this.domainToEntity(call));
+      this.callGateway.emitCallUpdate(call);
+    }
+
+    return this.mapToResponseDto(call);
+  }
+
+  /**
+   * Unmute (barge) the supervisor so they can speak
+   */
+  async supervisorUnmute(callId: string): Promise<CallResponseDto> {
+    const callEntity = await this.findCallEntityOrFail(callId);
+    const call = this.entityToDomain(callEntity);
+
+    if (!call.supervisorParticipantSid) {
+      throw new BadRequestException('No supervisor is injected for this call');
+    }
+
+    const provider = this.selectProvider(call.to);
+    if (provider === 'infobip') {
+      this.logger?.warn?.('Infobip supervisor mute/unmute not implemented');
+      throw new BadRequestException('Supervisor mute/unmute not supported for Infobip at this time');
+    } else {
+      const externalId = call.twilioSid || callId;
+      await this.twilioAdapter.setParticipantMuted(externalId, call.supervisorParticipantSid, false);
+    }
+
+    this.callGateway.emitCallUpdate(call);
+    return this.mapToResponseDto(call);
+  }
+
+  /**
+   * Mute the supervisor so they are in whisper mode
+   */
+  async supervisorMute(callId: string): Promise<CallResponseDto> {
+    const callEntity = await this.findCallEntityOrFail(callId);
+    const call = this.entityToDomain(callEntity);
+
+    if (!call.supervisorParticipantSid) {
+      throw new BadRequestException('No supervisor is injected for this call');
+    }
+
+    const provider = this.selectProvider(call.to);
+    if (provider === 'infobip') {
+      this.logger?.warn?.('Infobip supervisor mute/unmute not implemented');
+      throw new BadRequestException('Supervisor mute/unmute not supported for Infobip at this time');
+    } else {
+      const externalId = call.twilioSid || callId;
+      await this.twilioAdapter.setParticipantMuted(externalId, call.supervisorParticipantSid, true);
+    }
+
+    this.callGateway.emitCallUpdate(call);
+    return this.mapToResponseDto(call);
+  }
+
+  /**
    * Puts a call on hold.
    */
   async holdCall(callId: string): Promise<CallResponseDto> {
@@ -220,35 +298,105 @@ export class CallService {
   }
 
   /**
-   * Handles an incoming call webhook from Twilio.
+   * Legacy: Handles an incoming call webhook from Twilio.
+   * Replaced by `handleTwilioStatusCallback` which handles all status callbacks
+   * and is idempotent. Kept for compatibility but delegates to the unified handler.
    */
   async handleIncomingCall(twilioPayload: any) {
-    const callId = twilioPayload.CallSid;
-    const existingCall = await this.callRepository.findOneBy({ id: callId });
-    if (existingCall) {
-      console.log(`Call with ID ${callId} already exists. Ignoring duplicate webhook.`);
-      return;
-    }
-
-    const call = new Call(callId, twilioPayload.From, twilioPayload.To, CallDirection.INBOUND);
-    this.stateMachine.startCall(call);
-    
-    await this.callRepository.save(this.domainToEntity(call));
-    this.callGateway.emitNewCall(call);
-    console.log(`Handled incoming call ${call.id} from ${twilioPayload.From} to ${twilioPayload.To}`);
+    // Deprecated path kept for compatibility — delegate to unified handler.
+    console.warn('handleIncomingCall is deprecated. Use handleTwilioStatusCallback instead.');
+    await this.handleTwilioStatusCallback(twilioPayload);
   }
 
   /**
-   * Handles a call ended webhook from Twilio.
+   * Legacy: Handles a call ended webhook from Twilio.
+   * Replaced by `handleTwilioStatusCallback`. Kept but delegates.
    */
   async handleCallEnded(callId: string) {
-    const callEntity = await this.callRepository.findOneBy({ id: callId });
-    if (callEntity && callEntity.state !== CallState.ENDED) {
-      const call = this.entityToDomain(callEntity);
-      this.stateMachine.endCall(call);
+    console.warn('handleCallEnded is deprecated. Use handleTwilioStatusCallback instead.');
+    await this.handleTwilioStatusCallback({ CallSid: callId, CallStatus: 'completed' });
+  }
+
+  /**
+   * Unified handler for Twilio status callbacks and inbound voice requests.
+   * - Finds or creates the corresponding Call entity (by `twilioSid` or `id`).
+   * - Applies idempotent, state-machine-driven transitions for statuses:
+   *   queued, ringing -> RINGING
+   *   in-progress/answered -> ANSWERED
+   *   completed/failed/busy/no-answer/canceled -> ENDED
+   */
+  async handleTwilioStatusCallback(twilioPayload: any) {
+    const callSid = twilioPayload.CallSid;
+    const status = (twilioPayload.CallStatus || '').toLowerCase();
+    const isInbound = twilioPayload.Direction === 'inbound' || false;
+
+    // Try to find by twilioSid first (outbound calls from us), then by id (inbound where id==CallSid)
+    let callEntity = await this.callRepository.findOneBy({ twilioSid: callSid } as any);
+    if (!callEntity) {
+      callEntity = await this.callRepository.findOneBy({ id: callSid } as any);
+    }
+
+    // If call does not exist and Twilio reports a new inbound ringing call, create it.
+    if (!callEntity && status === 'ringing' && (isInbound || twilioPayload.To?.includes(this.configService.get<string>('TWILIO_PHONE_NUMBER') || ''))) {
+      const call = new Call(callSid, twilioPayload.From, twilioPayload.To, CallDirection.INBOUND);
+      // Ensure both id and twilioSid are set for mapping
+      call.twilioSid = callSid;
+      try {
+        this.stateMachine.startCall(call);
+      } catch (err) {
+        console.warn('Cannot start call state machine for inbound call', err?.message || err);
+      }
       await this.callRepository.save(this.domainToEntity(call));
+      this.callGateway.emitNewCall(call);
       this.callGateway.emitCallUpdate(call);
-      console.log(`Call ${callId} has ended.`);
+      this.logger?.log?.(`Created inbound call ${call.id} from ${twilioPayload.From}`);
+      return;
+    }
+
+    if (!callEntity) {
+      // Nothing to do if we can't map this callback to a call record.
+      this.logger?.warn?.(`Received Twilio callback for unknown call SID ${callSid} with status ${status}`);
+      return;
+    }
+
+    // Map entity -> domain
+    const call = this.entityToDomain(callEntity);
+    // Persist missing twilioSid when possible
+    if (!call.twilioSid) {
+      call.twilioSid = callSid;
+    }
+
+    // Decide transition based on status
+    try {
+      if (status === 'queued' || status === 'ringing') {
+        if (this.stateMachine.canTransition(call, CallState.RINGING)) {
+          this.stateMachine.startCall(call);
+        }
+      } else if (status === 'in-progress' || status === 'answered') {
+        if (this.stateMachine.canTransition(call, CallState.ANSWERED)) {
+          this.stateMachine.answerCall(call);
+        }
+      } else if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(status)) {
+        if (this.stateMachine.canTransition(call, CallState.ENDED)) {
+          this.stateMachine.endCall(call);
+        }
+      } else {
+        // Unknown or unhandled status - log and exit
+        this.logger?.debug?.(`Unhandled Twilio status: ${status} for call ${callSid}`);
+      }
+
+      // Persist changes and emit update
+      const updatedEntity = this.domainToEntity(call);
+      await this.callRepository.save(updatedEntity);
+      this.callGateway.emitCallUpdate(call);
+    } catch (err) {
+      if (err instanceof CallStateTransitionError) {
+        // Idempotency: if transition not allowed, just log and ignore
+        this.logger?.warn?.(`State transition failed for call ${callSid}: ${err.message}`);
+      } else {
+        this.logger?.error?.('Error handling Twilio callback', err?.stack || err?.message || err);
+        throw err;
+      }
     }
   }
   
@@ -271,6 +419,9 @@ export class CallService {
     if ((entity as any).twilioSid) {
       call.twilioSid = (entity as any).twilioSid;
     }
+    if ((entity as any).supervisorParticipantSid) {
+      call.supervisorParticipantSid = (entity as any).supervisorParticipantSid;
+    }
     return call;
   }
   
@@ -289,6 +440,9 @@ export class CallService {
     if ((call as any).twilioSid) {
       (entity as any).twilioSid = (call as any).twilioSid;
     }
+    if ((call as any).supervisorParticipantSid) {
+      (entity as any).supervisorParticipantSid = (call as any).supervisorParticipantSid;
+    }
     return entity;
   }
 
@@ -303,6 +457,7 @@ export class CallService {
       startedAt: call.startedAt,
       answeredAt: call.answeredAt,
       endedAt: call.endedAt,
+      supervisorParticipantSid: call.supervisorParticipantSid,
     };
   }
 }

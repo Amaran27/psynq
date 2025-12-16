@@ -22,6 +22,7 @@ export class CallResponseDto {
   startedAt?: Date;
   answeredAt?: Date;
   endedAt?: Date;
+  supervisorParticipantSid?: string;
 }
 
 export class CallActionDto {
