@@ -1,24 +1,37 @@
-import { Module, ValidationPipe, forwardRef } from '@nestjs/common';
+import { Module, ValidationPipe } from '@nestjs/common';
 import { APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { TwilioAdapter } from './adapters/twilio.adapter';
-import { InfobipAdapter } from './telephony/infobip.adapter';
-import { CallController } from './call.controller';
-import { CallService } from './services/call.service';
-import { CallGateway } from './call.gateway';
 import { TwilioModule } from './twilio/twilio.module';
+import { WebhookController } from './webhooks/webhook.controller';
+import { CallEntity } from './entities/call.entity';
+import { UserEntity } from './entities/user.entity';
+import { AuthModule } from './auth/auth.module';
+import { CallModule } from './call/call.module';
 
 @Module({
-  imports: [ConfigModule.forRoot(), TwilioModule],
-  controllers: [AppController, CallController],
+  imports: [
+    ConfigModule.forRoot(),
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: 'localhost',
+      port: 5432,
+      username: 'psynq_user',
+      password: 'mysecretpassword',
+      database: 'psynq_db',
+      entities: [CallEntity, UserEntity],
+      synchronize: true,
+    }),
+    TypeOrmModule.forFeature([UserEntity]), // CallEntity is in CallModule
+    TwilioModule,
+    AuthModule,
+    CallModule, // Import the new CallModule
+  ],
+  controllers: [AppController, WebhookController], // CallController moved to CallModule
   providers: [
     AppService,
-    TwilioAdapter,
-    InfobipAdapter,
-    CallService,
-    CallGateway,
     {
       provide: APP_PIPE,
       useClass: ValidationPipe,

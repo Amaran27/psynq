@@ -25,8 +25,8 @@ export class CallGateway {
   }
 
   @SubscribeMessage('getActiveCalls')
-  handleGetActiveCalls(): Call[] {
-    const dtos = this.callService.getActiveCalls();
+  async handleGetActiveCalls(): Promise<Call[]> {
+    const dtos = await this.callService.getActiveCalls();
     return dtos.map(dto => {
       const call = new Call(dto.id, dto.from, dto.to, dto.direction as CallDirection);
       call.state = dto.state as CallState;

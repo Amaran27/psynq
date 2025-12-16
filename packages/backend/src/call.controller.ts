@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Put, Body, Param, NotFoundException } from '@nestjs/common';
-import { CallService } from './services/call.service.js';
-import { CreateCallDto, CallResponseDto, CallActionDto } from './dtos/call.dto.js';
+import { Controller, Get, Post, Put, Body, Param, NotFoundException, UseGuards } from '@nestjs/common';
+import { CallService } from './services/call.service';
+import { CreateCallDto, CallResponseDto, CallActionDto } from './dtos/call.dto';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Controller('calls')
+@UseGuards(JwtAuthGuard)
 export class CallController {
   constructor(private readonly callService: CallService) {}
 
@@ -18,16 +20,16 @@ export class CallController {
    * Get a specific call by ID
    */
   @Get(':id')
-  getCall(@Param('id') callId: string): CallResponseDto {
-    return this.callService.getCall(callId);
+  async getCall(@Param('id') callId: string): Promise<CallResponseDto> {
+    return await this.callService.getCall(callId);
   }
 
   /**
    * Get all active calls
    */
   @Get()
-  getActiveCalls(): CallResponseDto[] {
-    return this.callService.getActiveCalls();
+  async getActiveCalls(): Promise<CallResponseDto[]> {
+    return await this.callService.getActiveCalls();
   }
 
   /**
@@ -45,16 +47,16 @@ export class CallController {
    * Put a call on hold
    */
   @Put(':id/hold')
-  holdCall(@Param('id') callId: string): CallResponseDto {
-    return this.callService.holdCall(callId);
+  async holdCall(@Param('id') callId: string): Promise<CallResponseDto> {
+    return await this.callService.holdCall(callId);
   }
 
   /**
    * Resume a call from hold
    */
   @Put(':id/resume')
-  resumeCall(@Param('id') callId: string): CallResponseDto {
-    return this.callService.resumeCall(callId);
+  async resumeCall(@Param('id') callId: string): Promise<CallResponseDto> {
+    return await this.callService.resumeCall(callId);
   }
 
   /**

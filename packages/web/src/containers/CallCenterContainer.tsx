@@ -1,22 +1,25 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useCallStore } from '../stores/call.store';
-import { HttpCallApiAdapter } from '../adapters/http-call-api.adapter';
+import { useAuthStore } from '../stores/auth.store';
+import { useAdapterStore } from '../stores/adapter.store';
 import { CallCenterView } from '../components/CallCenterView';
-import { Call } from '@psynq/core';
+import { LoginScreen } from '../components/LoginScreen';
+import { AgentStatusSelector } from '../components/AgentStatusSelector';
+import { AgentStatus } from '../../backend/src/auth/enums/agent-status.enum';
 
 export function CallCenterContainer() {
   const {
     calls,
     currentCall,
-    isLoading,
-    error,
+    isLoading: callsLoading,
+    error: callsError,
     activeCallsCount,
     ringingCallsCount,
     answeredCallsCount,
     onHoldCallsCount,
-    setApiAdapter,
+    initializeTelephony,
     loadActiveCalls,
     createCall,
     answerCall,
@@ -28,104 +31,142 @@ export function CallCenterContainer() {
     addCall,
   } = useCallStore();
 
-  // Initialize API adapter on mount
+  const {
+    isLoggedIn,
+    user,
+    token,
+    status: agentStatus,
+    isLoading: authLoading,
+    error: authError,
+    login,
+    logout,
+    loadInitialAuth,
+    updateAgentStatus,
+    fetchAgentStatus,
+  } = useAuthStore();
+
+  const { initializeAdapter, apiAdapter } = useAdapterStore();
+
+  // Initialize API adapter
   useEffect(() => {
-    const adapter = new HttpCallApiAdapter();
-    setApiAdapter(adapter);
-  }, [setApiAdapter]);
+    initializeAdapter();
+  }, [initializeAdapter]);
 
-  // Load active calls on mount
+  // Load initial authentication state
   useEffect(() => {
-    loadActiveCalls();
-  }, [loadActiveCalls]);
+    loadInitialAuth();
+  }, [loadInitialAuth]);
 
-  // Subscribe to real-time call updates
+  // Once authenticated, set adapter for auth store and initialize telephony
   useEffect(() => {
-    const adapter = new HttpCallApiAdapter();
+    if (isLoggedIn && token && user && apiAdapter) {
+      useAuthStore.getState().setApiAdapter(apiAdapter);
+      initializeTelephony(user.id, token);
+      loadActiveCalls(token);
+      fetchAgentStatus();
 
-    const unsubscribeUpdates = adapter.subscribeToCallUpdates((updatedCall: Call) => {
-      updateCall(updatedCall);
-    });
+      // Setup WebSocket subscriptions when authenticated
+      const unsubscribeUpdates = apiAdapter.subscribeToCallUpdates((updatedCall: Call) => {
+        updateCall(updatedCall);
+      }, token);
 
-    const unsubscribeNewCalls = adapter.subscribeToNewCalls((newCall: Call) => {
-      addCall(newCall);
-    });
+      const unsubscribeNewCalls = apiAdapter.subscribeToNewCalls((newCall: Call) => {
+        addCall(newCall);
+      }, token);
 
-    return () => {
-      unsubscribeUpdates();
-      unsubscribeNewCalls();
-    };
-  }, [updateCall, addCall]);
+      return () => {
+        unsubscribeUpdates();
+        unsubscribeNewCalls();
+      };
+    }
+  }, [isLoggedIn, token, user, apiAdapter, initializeTelephony, loadActiveCalls, fetchAgentStatus, updateCall, addCall]);
+
+  const handleLogin = async (username: string, password: string) => {
+    try {
+      await login(username, password);
+    } catch (err) {
+      console.error('Login failed:', err);
+    }
+  };
 
   const handleAnswerCall = async (callId: string) => {
+    if (!token || !user?.id) return;
     try {
-      // For demo purposes, use a fixed agent ID
-      const agentId = '550e8400-e29b-41d4-a716-446655440000';
-      await answerCall(callId, agentId);
-      // Auto-select the answered call
-      const answeredCall = calls.find(c => c.id === callId);
-      if (answeredCall) {
-        selectCall(answeredCall);
-      }
-    } catch (error) {
-      console.error('Failed to answer call:', error);
+      await answerCall(callId, user.id, token);
+    } catch (err) {
+      console.error('Failed to answer call:', err);
     }
   };
 
   const handleHoldCall = async (callId: string) => {
+    if (!token) return;
     try {
-      await holdCall(callId);
-    } catch (error) {
-      console.error('Failed to hold call:', error);
+      await holdCall(callId, token);
+    } catch (err) {
+      console.error('Failed to hold call:', err);
     }
   };
 
   const handleResumeCall = async (callId: string) => {
+    if (!token) return;
     try {
-      await resumeCall(callId);
-    } catch (error) {
-      console.error('Failed to resume call:', error);
+      await resumeCall(callId, token);
+    } catch (err) {
+      console.error('Failed to resume call:', err);
     }
   };
 
   const handleEndCall = async (callId: string) => {
+    if (!token) return;
     try {
-      await endCall(callId);
-    } catch (error) {
-      console.error('Failed to end call:', error);
+      await endCall(callId, token);
+    } catch (err) {
+      console.error('Failed to end call:', err);
     }
   };
 
   const handleSelectCall = (callId: string | null) => {
-    if (callId) {
-      const call = calls.find(c => c.id === callId);
-      selectCall(call || null);
-    } else {
-      selectCall(null);
-    }
+    selectCall(callId ? calls.find(c => c.id === callId) || null : null);
   };
 
   const handleCreateCall = async (to: string) => {
+    if (!token) return;
     try {
-      const from = 'agent1'; // Fixed for demo
-      await createCall(from, to);
-    } catch (error) {
-      console.error('Failed to create call:', error);
+      const from = process.env.NEXT_PUBLIC_TWILIO_FROM_NUMBER || 'default_from_number';
+      await createCall(from, to, token);
+    } catch (err) {
+      console.error('Failed to create call:', err);
     }
   };
+
+  const handleUpdateAgentStatus = async (newStatus: AgentStatus) => {
+    if (!token) return;
+    try {
+      await updateAgentStatus(newStatus);
+    } catch (err) {
+      console.error('Failed to update agent status:', err);
+    }
+  };
+
+  if (!isLoggedIn) {
+    return <LoginScreen onLogin={handleLogin} isLoading={authLoading} error={authError} />;
+  }
 
   return (
     <CallCenterView
       calls={calls}
       currentCall={currentCall}
-      isLoading={isLoading}
-      error={error}
+      isLoading={callsLoading || authLoading}
+      error={callsError || authError}
       stats={{
         activeCalls: activeCallsCount,
         ringingCalls: ringingCallsCount,
         answeredCalls: answeredCallsCount,
         onHoldCalls: onHoldCallsCount,
       }}
+      agentStatus={agentStatus}
+      onUpdateAgentStatus={handleUpdateAgentStatus}
+      onLogout={logout}
       onCreateCall={handleCreateCall}
       onAnswerCall={handleAnswerCall}
       onHoldCall={handleHoldCall}
