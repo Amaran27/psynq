@@ -4,12 +4,16 @@ import { Call, CallState } from '@psynq/core';
 import { TelephonyCapabilities } from '../interfaces/telephony-capabilities.interface';
 import { CallParticipant, SupervisorControlOptions } from '../interfaces/call-participant.interface';
 import * as ari from 'ari-client';
+import { StorageService } from '../modules/storage/storage.service';
 
 @Injectable()
 export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
   private client: ari.Client | null = null;
   private onCallReceived: ((call: Call) => void) | null = null;
   private onCallEnded: ((callId: string) => void) | null = null;
+  private recordings: Map<string, ari.StoredRecording> = new Map();
+
+  constructor(private storageService: StorageService) {}
 
   async onModuleInit() {
     await this.connectToAsterisk();
@@ -57,11 +61,51 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
       call.state = CallState.RINGING;
       this.onCallReceived(call);
     }
+    // Start recording
+    this.startRecording(channel.id);
+  }
+
+  private async startRecording(channelId: string) {
+    if (this.client) {
+      try {
+        const recording = await this.client.channels.record({
+          channelId,
+          name: `recording-${channelId}`,
+          format: 'wav',
+          ifExists: 'overwrite'
+        });
+        this.recordings.set(channelId, recording);
+      } catch (error) {
+        console.error('Failed to start recording:', error);
+      }
+    }
   }
 
   private handleCallHangup(channel: any) {
+    // Stop recording and upload
+    this.stopRecording(channel.id);
     if (this.onCallEnded) {
       this.onCallEnded(channel.id);
+    }
+  }
+
+  private async stopRecording(channelId: string) {
+    const recording = this.recordings.get(channelId);
+    if (recording && this.client) {
+      try {
+        // Stop the recording
+        await this.client.recordings.stop({ recordingName: recording.name });
+        // Get the stored recording
+        const storedRecording = await this.client.recordings.getStored({ recordingName: recording.name });
+        // Download and upload to MinIO
+        const stream = await this.client.recordings.getStoredFile({ recordingName: recording.name });
+        await this.storageService.uploadRecording(channelId, stream, 'audio/wav');
+        // Clean up
+        await this.client.recordings.deleteStored({ recordingName: recording.name });
+        this.recordings.delete(channelId);
+      } catch (error) {
+        console.error('Failed to stop/upload recording:', error);
+      }
     }
   }
 
@@ -141,5 +185,27 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
         console.error('Failed to hangup call:', error);
       }
     }
+  }
+
+  /**
+   * Basic health check: returns true if ARI client connected and reachable.
+   * For unit tests (no ARI), returns false safely.
+   */
+  async healthCheck(): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      // Try to fetch a small resource to confirm ARI is reachable
+      const channels = await this.client.channels.list();
+      return Array.isArray(channels);
+    } catch (err) {
+      console.warn('Asterisk health check failed', err?.message || err);
+      return false;
+    }
+  }
+
+  async getRecording(callId: string): Promise<import('stream').Readable | null> {
+    // Asterisk recording implementation pending; return null for now
+    console.warn('getRecording not implemented for Asterisk');
+    return null;
   }
 }

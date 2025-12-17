@@ -11,6 +11,7 @@ export class TwilioAdapter implements TelephonyPort {
   private client: twilio.Twilio | null;
   private onCallReceived: ((call: Call) => void) | null = null;
   private onCallEnded: ((callId: string) => void) | null = null;
+  private authToken: string;
 
   getCapabilities(): import('../interfaces/telephony-capabilities.interface').TelephonyCapabilities {
     return {
@@ -42,6 +43,7 @@ export class TwilioAdapter implements TelephonyPort {
     }
 
     this.client = twilio(accountSid, authToken);
+    this.authToken = authToken;
   }
 
   setCallReceivedCallback(callback: (call: Call) => void) {
@@ -291,5 +293,11 @@ export class TwilioAdapter implements TelephonyPort {
     } catch (error) {
       console.error(`Failed to redirect call ${callSid}:`, error);
     }
+  }
+
+  async getRecording(callId: string): Promise<import('stream').Readable | null> {
+    // Twilio recording retrieval implementation pending; return null for now
+    this.logger.warn('getRecording not implemented for Twilio');
+    return null;
   }
 }

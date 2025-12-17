@@ -9,8 +9,13 @@ import { WebhookController } from './webhooks/webhook.controller';
 import { CallEntity } from './entities/call.entity';
 import { UserEntity } from './entities/user.entity';
 import { CallParticipantEntity } from './entities/call-participant.entity';
+import { RecordingEntity } from './entities/recording.entity';
 import { AuthModule } from './auth/auth.module';
 import { CallModule } from './call/call.module';
+import { StorageModule } from './modules/storage/storage.module';
+import { AsteriskModule } from './modules/asterisk/asterisk.module';
+import { MonitoringModule } from './modules/monitoring/monitoring.module';
+import { MediasoupModule } from './modules/mediasoup/mediasoup.module';
 
 @Module({
   imports: [
@@ -25,7 +30,7 @@ import { CallModule } from './call/call.module';
       username: process.env.DB_USER || 'psynq_user',
       password: process.env.DB_PASSWORD || 'mysecretpassword',
       database: process.env.DB_NAME || 'psynq_db',
-      entities: [CallEntity, UserEntity, CallParticipantEntity],
+      entities: [CallEntity, UserEntity, CallParticipantEntity, RecordingEntity],
       // In development we keep synchronize for convenience; in production it must be disabled.
       synchronize: process.env.NODE_ENV !== 'production',
       migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -36,6 +41,10 @@ import { CallModule } from './call/call.module';
     TwilioModule,
     AuthModule,
     CallModule, // Import the new CallModule
+    StorageModule,
+    // MediasoupModule,
+    AsteriskModule,
+    MonitoringModule,
   ],
   controllers: [AppController, WebhookController], // CallController moved to CallModule
   providers: [

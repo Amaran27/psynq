@@ -52,6 +52,7 @@ import { CallParticipant } from '../interfaces/call-participant.interface';
 
 const mockRepository = () => ({
   findOneBy: jest.fn(),
+  findOne: jest.fn(), // used for queries with explicit where clauses
   save: jest.fn(),
   find: jest.fn(),
 });
@@ -69,6 +70,7 @@ const mockTwilioAdapter = () => ({
   endCall: jest.fn(),
   injectSupervisor: jest.fn(),
   setParticipantMuted: jest.fn(),
+  getRecording: jest.fn().mockResolvedValue(null),
   getCapabilities: jest.fn().mockReturnValue({
     supportsSupervisorInjection: true,
     supportsParticipantMute: true,
@@ -97,11 +99,16 @@ const mockCallParticipantService = () => ({
   getSupervisorsByCallId: jest.fn(),
 });
 
+const mockStorageService = () => ({
+  uploadRecording: jest.fn(),
+});
+
 describe('CallService.handleTwilioStatusCallback', () => {
   let service: CallService;
   let repository: ReturnType<typeof mockRepository>;
   let gateway: ReturnType<typeof mockGateway>;
   let callParticipantService: ReturnType<typeof mockCallParticipantService>;
+  let storageService: ReturnType<typeof mockStorageService>;
 
   beforeEach(() => {
     repository = mockRepository();
@@ -110,9 +117,10 @@ describe('CallService.handleTwilioStatusCallback', () => {
     const infobipAdapter = mockInfobip();
     const configService = mockConfig() as any;
     callParticipantService = mockCallParticipantService();
+    storageService = mockStorageService();
 
     // @ts-ignore - inject mocks
-    service = new CallService(repository as any, gateway as any, twilioAdapter as any, infobipAdapter as any, configService, callParticipantService);
+    service = new CallService(repository as any, gateway as any, twilioAdapter as any, infobipAdapter as any, configService, callParticipantService, storageService as any);
   });
 
   test('creates inbound call on ringing when none exists', async () => {

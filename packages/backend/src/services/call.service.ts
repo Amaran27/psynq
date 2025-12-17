@@ -10,6 +10,7 @@ import { CallEntity } from '../entities/call.entity';
 import { ConfigService } from '@nestjs/config';
 import { CallParticipant, SupervisorControlOptions } from '../interfaces/call-participant.interface';
 import { CallParticipantService } from './call-participant.service';
+import { StorageService } from '../modules/storage/storage.service';
 
 @Injectable()
 export class CallService {
@@ -23,6 +24,7 @@ export class CallService {
     private readonly infobipAdapter: InfobipAdapter,
     private readonly configService: ConfigService,
     private readonly callParticipantService: CallParticipantService,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -556,6 +558,17 @@ export class CallService {
           await this.cleanupRelatedActiveCalls(call);
         } catch (cleanupErr) {
           this.logger?.warn?.(`Cleanup of related calls failed for call ${call.id}: ${cleanupErr?.message || cleanupErr}`);
+        }
+
+        // Try to upload recording if available
+        try {
+          const recording = await this.twilioAdapter.getRecording(call.externalId || callSid);
+          if (recording) {
+            await this.storageService.uploadRecording(call.id, recording, 'audio/wav');
+            this.logger?.log?.(`Uploaded recording for call ${call.id}`);
+          }
+        } catch (uploadErr) {
+          this.logger?.warn?.(`Failed to upload recording for call ${call.id}: ${uploadErr?.message || uploadErr}`);
         }
       }
     } catch (err) {

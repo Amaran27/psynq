@@ -1,5 +1,6 @@
 import { Call } from '@psynq/core';
 import { CallParticipant, SupervisorControlOptions } from '../interfaces/call-participant.interface';
+import { Readable } from 'stream';
 
 import { TelephonyCapabilities } from '../interfaces/telephony-capabilities.interface';
 
@@ -42,4 +43,10 @@ export interface TelephonyPort {
    * Ends a call and disconnects all participants.
    */
   endCall(callId: string): Promise<void>;
+  
+  /**
+   * Retrieves the recording stream for a completed call, if available.
+   * Returns null if no recording exists.
+   */
+  getRecording(callId: string): Promise<Readable | null>;
 }

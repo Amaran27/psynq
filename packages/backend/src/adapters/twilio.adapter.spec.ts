@@ -1,5 +1,7 @@
 import { TwilioAdapter } from './twilio.adapter';
 
+jest.mock('node-fetch');
+
 const mockClient = () => ({
   calls: {
     create: jest.fn(),

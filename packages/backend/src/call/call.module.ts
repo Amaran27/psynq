@@ -11,6 +11,7 @@ import { TwilioAdapter } from '../adapters/twilio.adapter';
 import { InfobipAdapter } from '../adapters/infobip.adapter';
 import { AuthModule } from '../auth/auth.module';
 import { TwilioModule } from '../twilio/twilio.module';
+import { StorageModule } from '../modules/storage/storage.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { TwilioModule } from '../twilio/twilio.module';
     ConfigModule,
     forwardRef(() => AuthModule),
     TwilioModule,
+    StorageModule,
   ],
   controllers: [CallController],
   providers: [CallService, CallParticipantService, CallGateway, TwilioAdapter, InfobipAdapter],

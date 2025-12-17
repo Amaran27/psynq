@@ -66,4 +66,5 @@ test-results/
 playwright-report/
 
 # Deployment
-deploy/docker-compose.override.yml
+deploy/*
+deploy/*.*

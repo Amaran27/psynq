@@ -254,4 +254,10 @@ export class InfobipAdapter implements TelephonyPort {
   getProviderName(): string {
     return 'infobip';
   }
+
+  async getRecording(callId: string): Promise<import('stream').Readable | null> {
+    // Infobip recording implementation pending; return null for now
+    this.logger.warn('getRecording not implemented for Infobip');
+    return null;
+  }
 }

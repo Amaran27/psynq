@@ -8,7 +8,7 @@ export class HttpCallApiAdapter implements CallApiPort {
   private baseUrl: string;
   private socket: Socket | null = null;
 
-  constructor(baseUrl = 'http://localhost:3000') {
+  constructor(baseUrl = 'http://localhost:3001') {
     this.baseUrl = baseUrl;
   }
 

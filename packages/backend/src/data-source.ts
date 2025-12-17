@@ -2,6 +2,8 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { CallEntity } from './entities/call.entity';
 import { UserEntity } from './entities/user.entity';
+import { CallParticipantEntity } from './entities/call-participant.entity';
+import { RecordingEntity } from './entities/recording.entity';
 
 // DataSource used by TypeORM CLI for migrations and by deployment scripts.
 const AppDataSource = new DataSource({
@@ -11,7 +13,7 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USER || 'psynq_user',
   password: process.env.DB_PASSWORD || 'mysecretpassword',
   database: process.env.DB_NAME || 'psynq_db',
-  entities: [CallEntity, UserEntity],
+  entities: [CallEntity, UserEntity, CallParticipantEntity, RecordingEntity],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
 });
 
