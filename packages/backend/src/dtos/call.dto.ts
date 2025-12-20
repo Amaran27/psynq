@@ -10,6 +10,10 @@ export class CreateCallDto {
   @IsOptional()
   @IsString()
   agentId?: string;
+
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
 }
 
 export class CallResponseDto {
@@ -19,6 +23,7 @@ export class CallResponseDto {
   from: string;
   to: string;
   agentId?: string;
+  organizationId?: string;
   startedAt?: Date;
   answeredAt?: Date;
   endedAt?: Date;

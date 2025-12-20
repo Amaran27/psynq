@@ -10,7 +10,7 @@ export class MonitoringController {
   async proxyToGrafana(@Req() req: Request, @Res() res: Response) {
     // Proxy all requests under /monitoring to Grafana
     this.proxy.web(req, res, {
-      target: 'http://grafana:3000', // Grafana service in Docker
+      target: 'http://localhost:3003', // Grafana on localhost
       changeOrigin: true,
       ws: true, // For WebSocket support if needed
     });

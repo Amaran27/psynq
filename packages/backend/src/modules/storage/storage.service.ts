@@ -5,32 +5,32 @@ import { StoragePort } from '../../ports/storage.port';
 export class StorageService {
   private readonly logger = new (require('@nestjs/common').Logger)(StorageService.name);
 
-  constructor(@Inject('StoragePort') private storageAdapter: StoragePort) {}
+  constructor(@Inject('STORAGE_PROVIDER') private storageAdapter: StoragePort) {}
 
-  async uploadRecording(callId: string, stream: any, contentType: string): Promise<void> {
-    const key = `recordings/${callId}.wav`; // Assume WAV for now
-    await this.storageAdapter.upload(key, stream, contentType);
+  async uploadRecording(callId: string, stream: any, contentType: string, organizationId: string | null = null): Promise<string> {
+    const timestamp = Date.now();
+    const key = `recordings/${callId}/${timestamp}.wav`;
+    await this.storageAdapter.upload(organizationId, key, stream, contentType);
+    return key;
   }
 
-  async getRecordingUrl(callId: string, expiresInSeconds = 3600): Promise<string> {
-    const key = `recordings/${callId}.wav`;
-    return this.storageAdapter.getSignedUrl(key, expiresInSeconds, 'GET');
+  async getRecordingUrl(key: string, organizationId: string | null = null, expiresInSeconds = 3600): Promise<string> {
+    return this.storageAdapter.getSignedUrl(organizationId, key, expiresInSeconds, 'GET');
   }
 
-  async deleteRecording(callId: string): Promise<void> {
-    const key = `recordings/${callId}.wav`;
-    await this.storageAdapter.delete(key);
+  async deleteRecording(key: string, organizationId: string | null = null): Promise<void> {
+    await this.storageAdapter.delete(organizationId, key);
   }
 
-  async listRecordings(): Promise<string[]> {
-    return this.storageAdapter.list('recordings/');
+  async listRecordings(organizationId: string | null = null): Promise<string[]> {
+    return this.storageAdapter.list(organizationId, 'recordings/');
   }
 
-  async cleanupOldRecordings(olderThanDays = 30): Promise<void> {
-    await this.storageAdapter.applyLifecyclePolicy('recordings/', olderThanDays);
+  async cleanupOldRecordings(organizationId: string | null = null, olderThanDays = 30): Promise<void> {
+    await this.storageAdapter.applyLifecyclePolicy(organizationId, 'recordings/', olderThanDays);
   }
 
-  async healthCheck(): Promise<boolean> {
-    return this.storageAdapter.healthCheck();
+  async healthCheck(organizationId: string | null = null): Promise<boolean> {
+    return this.storageAdapter.healthCheck(organizationId);
   }
 }

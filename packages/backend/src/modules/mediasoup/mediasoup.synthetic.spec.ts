@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import { Browser, launch } from 'puppeteer';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -6,11 +6,11 @@ import { MediasoupModule } from './mediasoup.module';
 import { ConfigModule } from '@nestjs/config';
 
 describe('Synthetic WebRTC Tests', () => {
-  let browser: puppeteer.Browser;
+  let browser: Browser;
   let app: INestApplication;
 
   beforeAll(async () => {
-    browser = await puppeteer.launch({ headless: true });
+    browser = await launch({ headless: true });
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [

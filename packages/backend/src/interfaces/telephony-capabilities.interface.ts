@@ -4,4 +4,6 @@ export interface TelephonyCapabilities {
   supportsParticipantHold: boolean;
   supportsBridgeCall: boolean;
   supportsTransfer?: boolean;
+  supportsBarge: boolean;
+  supportsWhisper: boolean;
 }

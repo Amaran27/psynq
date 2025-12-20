@@ -1,10 +1,18 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { CallEntity } from './call.entity';
+import { OrganizationEntity } from './organization.entity';
 
 @Entity('recordings')
 export class RecordingEntity {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @Column({ nullable: true })
+  organizationId: string;
+
+  @ManyToOne(() => OrganizationEntity)
+  @JoinColumn({ name: 'organizationId' })
+  organization: OrganizationEntity;
 
   @Column()
   callId: string;

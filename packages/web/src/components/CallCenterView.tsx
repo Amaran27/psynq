@@ -109,6 +109,20 @@ export function CallCenterView({
               >
                 Logout
               </button>
+              <a
+                href="/monitoring"
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Monitoring
+              </a>
+              {(useAuthStore.getState().user?.roles.includes('admin') || useAuthStore.getState().user?.roles.includes('system_admin')) && (
+                <a
+                  href="/settings"
+                  className="text-sm text-gray-600 hover:text-gray-800 font-medium"
+                >
+                  Settings
+                </a>
+              )}
             </div>
           </div>
         </div>

@@ -1,89 +1,72 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from '@nestjs/common';
 import { StoragePort } from '../ports/storage.port';
 import { Client } from 'minio';
 import { Readable } from 'stream';
+import { SettingsService } from '../services/settings.service';
 
 @Injectable()
 export class MinioStorageAdapter implements StoragePort {
-  private readonly logger = new (require('@nestjs/common').Logger)(MinioStorageAdapter.name);
-  private client: Client | null;
-  private bucket: string;
+  private readonly logger = new Logger(MinioStorageAdapter.name);
 
-  constructor(private configService: ConfigService) {
-    const endpoint = this.configService.get<string>('MINIO_ENDPOINT') || process.env.MINIO_ENDPOINT || 'localhost:9000';
-    const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY') || process.env.MINIO_ACCESS_KEY;
-    const secretKey = this.configService.get<string>('MINIO_SECRET_KEY') || process.env.MINIO_SECRET_KEY;
-    this.bucket = this.configService.get<string>('MINIO_BUCKET') || process.env.MINIO_BUCKET || 'psynq-recordings';
+  constructor(private readonly settingsService: SettingsService) {}
 
-    if (!accessKey || !secretKey) {
-      this.logger.warn('MinIO credentials not configured — MinioStorageAdapter will operate in "dry" mode.');
-      this.client = null;
-      return;
+  private async getClient(orgId: string | null): Promise<{ client: Client, bucket: string }> {
+    const config = await this.settingsService.getSetting(orgId, 'storage.minio.config', true);
+    if (!config || !config.accessKey || !config.secretKey) {
+      throw new Error(`MinIO configuration missing for organization ${orgId || 'system'}`);
     }
 
-    this.client = new Client({
-      endPoint: endpoint.replace('http://', '').replace('https://', ''), // MinIO expects without protocol
-      port: endpoint.includes(':') ? parseInt(endpoint.split(':')[1]) : 9000,
-      useSSL: endpoint.startsWith('https'),
-      accessKey,
-      secretKey,
+    const endpoint = config.endpoint || 'localhost';
+    const client = new Client({
+      endPoint: endpoint.replace('http://', '').replace('https://', ''),
+      port: config.port ? parseInt(config.port) : 9000,
+      useSSL: endpoint.startsWith('https') || config.useSSL,
+      accessKey: config.accessKey,
+      secretKey: config.secretKey,
     });
+
+    return { client, bucket: config.bucket || 'psynq-recordings' };
   }
 
-  async upload(key: string, stream: Readable, contentType: string, metadata?: Record<string, string>): Promise<void> {
-    if (!this.client) {
-      this.logger.warn('MinIO client not configured — upload will no-op.');
-      return;
-    }
+  async upload(orgId: string | null, key: string, stream: Readable, contentType: string, metadata?: Record<string, string>): Promise<void> {
     try {
-      await this.client.putObject(this.bucket, key, stream, undefined, { 'Content-Type': contentType, ...metadata });
-      this.logger.log(`Uploaded file to ${key}`);
+      const { client, bucket } = await this.getClient(orgId);
+      await client.putObject(bucket, key, stream, undefined, { 'Content-Type': contentType, ...metadata });
+      this.logger.log(`Uploaded file to minio://${bucket}/${key}`);
     } catch (error) {
       this.logger.error(`Failed to upload ${key}:`, error);
       throw error;
     }
   }
 
-  async getSignedUrl(key: string, expiresInSeconds: number, operation: 'GET' | 'PUT'): Promise<string> {
-    if (!this.client) {
-      throw new Error('MinIO client not configured');
-    }
+  async getSignedUrl(orgId: string | null, key: string, expiresInSeconds: number, operation: 'GET' | 'PUT'): Promise<string> {
     try {
-      const url = operation === 'GET'
-        ? await this.client.presignedGetObject(this.bucket, key, expiresInSeconds)
-        : await this.client.presignedPutObject(this.bucket, key, expiresInSeconds);
-      return url;
+      const { client, bucket } = await this.getClient(orgId);
+      return operation === 'GET'
+        ? await client.presignedGetObject(bucket, key, expiresInSeconds)
+        : await client.presignedPutObject(bucket, key, expiresInSeconds);
     } catch (error) {
       this.logger.error(`Failed to generate signed URL for ${key}:`, error);
       throw error;
     }
   }
 
-  async delete(key: string): Promise<void> {
-    if (!this.client) {
-      this.logger.warn('MinIO client not configured — delete will no-op.');
-      return;
-    }
+  async delete(orgId: string | null, key: string): Promise<void> {
     try {
-      await this.client.removeObject(this.bucket, key);
-      this.logger.log(`Deleted file ${key}`);
+      const { client, bucket } = await this.getClient(orgId);
+      await client.removeObject(bucket, key);
     } catch (error) {
       this.logger.error(`Failed to delete ${key}:`, error);
       throw error;
     }
   }
 
-  async list(prefix: string): Promise<string[]> {
-    if (!this.client) {
-      return [];
-    }
+  async list(orgId: string | null, prefix: string): Promise<string[]> {
     try {
-      const stream = this.client.listObjectsV2(this.bucket, prefix);
+      const { client, bucket } = await this.getClient(orgId);
+      const stream = client.listObjectsV2(bucket, prefix);
       const objects: any[] = [];
-      for await (const obj of stream) {
-        objects.push(obj);
-      }
+      for await (const obj of stream) { objects.push(obj); }
       return objects.map(obj => obj.name || '').filter(name => name);
     } catch (error) {
       this.logger.error(`Failed to list objects with prefix ${prefix}:`, error);
@@ -91,36 +74,27 @@ export class MinioStorageAdapter implements StoragePort {
     }
   }
 
-  async healthCheck(): Promise<boolean> {
-    if (!this.client) {
-      return false;
-    }
+  async healthCheck(orgId: string | null): Promise<boolean> {
     try {
-      await this.client.listBuckets();
+      const { client } = await this.getClient(orgId);
+      await client.listBuckets();
       return true;
     } catch (error) {
-      this.logger.error('MinIO health check failed:', error);
       return false;
     }
   }
 
-  async applyLifecyclePolicy(prefix: string, olderThanDays: number): Promise<void> {
-    if (!this.client) {
-      this.logger.warn('MinIO client not configured — lifecycle policy will no-op.');
-      return;
-    }
+  async applyLifecyclePolicy(orgId: string | null, prefix: string, olderThanDays: number): Promise<void> {
     try {
+      const { client, bucket } = await this.getClient(orgId);
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - olderThanDays);
-      const stream = this.client.listObjectsV2(this.bucket, prefix);
+      const stream = client.listObjectsV2(bucket, prefix);
       const objects: any[] = [];
-      for await (const obj of stream) {
-        objects.push(obj);
-      }
+      for await (const obj of stream) { objects.push(obj); }
       const toDelete = objects.filter(obj => obj.lastModified && obj.lastModified < cutoff);
       if (toDelete.length > 0) {
-        await this.client.removeObjects(this.bucket, toDelete.map(obj => obj.name || ''));
-        this.logger.log(`Deleted ${toDelete.length} old files under ${prefix}`);
+        await client.removeObjects(bucket, toDelete.map(obj => obj.name || ''));
       }
     } catch (error) {
       this.logger.error(`Failed to apply lifecycle policy for ${prefix}:`, error);

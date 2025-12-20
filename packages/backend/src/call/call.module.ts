@@ -9,6 +9,8 @@ import { CallController } from '../call.controller';
 import { CallGateway } from '../call.gateway';
 import { TwilioAdapter } from '../adapters/twilio.adapter';
 import { InfobipAdapter } from '../adapters/infobip.adapter';
+import { TelephonyRouterAdapter } from '../adapters/telephony-router.adapter';
+import { AsteriskModule } from '../modules/asterisk/asterisk.module';
 import { AuthModule } from '../auth/auth.module';
 import { TwilioModule } from '../twilio/twilio.module';
 import { StorageModule } from '../modules/storage/storage.module';
@@ -20,9 +22,21 @@ import { StorageModule } from '../modules/storage/storage.module';
     forwardRef(() => AuthModule),
     TwilioModule,
     StorageModule,
+    AsteriskModule,
   ],
   controllers: [CallController],
-  providers: [CallService, CallParticipantService, CallGateway, TwilioAdapter, InfobipAdapter],
+  providers: [
+    CallService, 
+    CallParticipantService, 
+    CallGateway, 
+    TwilioAdapter, 
+    InfobipAdapter,
+    TelephonyRouterAdapter, // Ensure it's available for DI resolution
+    {
+      provide: 'TELEPHONY_PROVIDER',
+      useClass: TelephonyRouterAdapter,
+    }
+  ],
   exports: [CallService],
 })
 export class CallModule {}

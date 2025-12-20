@@ -1,10 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { AgentStatus } from '@psynq/core';
+import { OrganizationEntity } from './organization.entity';
 
 export enum UserRole {
   AGENT = 'agent',
   SUPERVISOR = 'supervisor',
   ADMIN = 'admin',
+  SYSTEM_ADMIN = 'system_admin',
 }
 
 @Entity('users')
@@ -16,7 +18,14 @@ export class UserEntity {
   username: string;
 
   @Column()
-  password?: string; // The '?' denotes it's optional, useful for when returning user objects without the password
+  password?: string;
+
+  @Column({ nullable: true })
+  organizationId: string;
+
+  @ManyToOne(() => OrganizationEntity, (org) => org.users)
+  @JoinColumn({ name: 'organizationId' })
+  organization: OrganizationEntity;
 
   @Column({
     type: 'simple-array',

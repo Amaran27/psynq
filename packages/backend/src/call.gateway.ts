@@ -6,7 +6,7 @@ import { Call, CallState, CallDirection } from '@psynq/core';
 
 @WebSocketGateway({
   cors: {
-    origin: 'http://localhost:3001', // Allow frontend origin
+    origin: '*', // More permissive for now
   },
 })
 export class CallGateway {
@@ -16,11 +16,11 @@ export class CallGateway {
   constructor(@Inject(forwardRef(() => CallService)) private readonly callService: CallService) {}
 
   // Emit call updates to all connected clients
-  emitCallUpdate(call: Call) {
+  emitCallUpdate(call: any) {
     this.server.emit('callUpdate', call);
   }
 
-  emitNewCall(call: Call) {
+  emitNewCall(call: any) {
     this.server.emit('newCall', call);
   }
 

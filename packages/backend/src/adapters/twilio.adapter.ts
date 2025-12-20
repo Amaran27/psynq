@@ -1,79 +1,65 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from '@nestjs/common';
 import { TelephonyPort } from '../ports/telephony.port';
 import { Call } from '@psynq/core';
 import { CallParticipant, SupervisorControlOptions } from '../interfaces/call-participant.interface';
+import { BridgeOptions } from '../interfaces/bridge-options.interface';
 import twilio from 'twilio';
+import { createStandardParticipantId } from '../utils/participant-id.util';
+import { SettingsService } from '../services/settings.service';
+import { TelephonyCapabilities } from '../interfaces/telephony-capabilities.interface';
+import { Readable } from 'stream';
+import { PsynqException, TelephonyProviderError, ConfigurationMissingError } from '../common/exceptions/psynq.exception';
 
 @Injectable()
 export class TwilioAdapter implements TelephonyPort {
-  private readonly logger = new (require('@nestjs/common').Logger)(TwilioAdapter.name);
-  private client: twilio.Twilio | null;
-  private onCallReceived: ((call: Call) => void) | null = null;
-  private onCallEnded: ((callId: string) => void) | null = null;
-  private authToken: string;
+  private readonly logger = new Logger(TwilioAdapter.name);
+  private callReceivedCallback: ((call: Call) => void) | null = null;
+  private callEndedCallback: ((callId: string) => void) | null = null;
+  private participantJoinedCallback: ((participant: CallParticipant) => void) | null = null;
 
-  getCapabilities(): import('../interfaces/telephony-capabilities.interface').TelephonyCapabilities {
+  constructor(private readonly settingsService: SettingsService) {}
+
+  private async getClient(orgId: string | null): Promise<{ client: twilio.Twilio, config: any }> {
+    const config = await this.settingsService.getSetting(orgId, 'telephony.twilio.config', true);
+    if (!config || !config.accountSid || !config.authToken) {
+      throw new ConfigurationMissingError('telephony.twilio.config', orgId);
+    }
+    try {
+      return {
+        client: twilio(config.accountSid, config.authToken),
+        config
+      };
+    } catch (error) {
+      throw new TelephonyProviderError('Failed to initialize Twilio client', 'twilio', error);
+    }
+  }
+
+  getCapabilities(): TelephonyCapabilities {
     return {
       supportsSupervisorInjection: true,
       supportsParticipantMute: true,
       supportsParticipantHold: true,
       supportsBridgeCall: true,
-      supportsTransfer: true
+      supportsTransfer: true,
+      supportsBarge: true,
+      supportsWhisper: true
     };
   }
 
-  constructor(private configService: ConfigService) {
-    const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID') || process.env.TWILIO_ACCOUNT_SID;
-    const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN') || process.env.TWILIO_AUTH_TOKEN;
-    
-    // Previous behavior threw an error and prevented the app from starting when Twilio credentials
-    // were not set. For local/dev runs we prefer the app to start and only disable Twilio calls.
-    // if (!accountSid || !authToken) {
-    //   throw new Error('Twilio credentials not configured');
-    // }
-    
-    // Only initialize the Twilio client when credentials look valid. This avoids
-    // instantiating the client during unit tests or when env vars contain placeholder
-    // values that would cause the Twilio SDK to throw (e.g., accountSid not starting with 'AC').
-    if (!accountSid || !authToken || !accountSid.startsWith?.('AC')) {
-      console.warn('Twilio credentials not configured or invalid — TwilioAdapter will operate in "dry" mode.');
-      this.client = null as any;
-      return;
-    }
-
-    this.client = twilio(accountSid, authToken);
-    this.authToken = authToken;
-  }
-
-  setCallReceivedCallback(callback: (call: Call) => void) {
-    this.onCallReceived = callback;
-  }
-
-  setCallEndedCallback(callback: (callId: string) => void) {
-    this.onCallEnded = callback;
-  }
-
   async createCall(call: Call): Promise<string | undefined> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — createCall will no-op and return undefined.');
-      return undefined;
-    }
-
+    const orgId = (call as any).organizationId || null;
     try {
-      const fromNumber = this.configService.get<string>('TWILIO_PHONE_NUMBER');
+      const { client, config } = await this.getClient(orgId);
+      const fromNumber = config.phoneNumber;
       if (!fromNumber) {
-        throw new Error('TWILIO_PHONE_NUMBER not configured');
+        throw new ConfigurationMissingError('telephony.twilio.config.phoneNumber', orgId);
       }
 
-      // This TwiML instructs Twilio to dial the recipient and place them in a conference
-      // named after our internal call ID (which should be the Twilio Call SID).
       const twiml = `<Response><Dial><Conference>${call.id}</Conference></Dial></Response>`;
-
-      const backendUrl = this.configService.get<string>('BACKEND_URL');
+      const backendUrl = config.backendUrl;
       const statusCallback = backendUrl ? `${backendUrl}/webhooks/twilio/voice` : undefined;
 
-      const created = await this.client.calls.create({
+      const created = await client.calls.create({
         to: call.to,
         from: fromNumber,
         twiml: twiml,
@@ -82,222 +68,180 @@ export class TwilioAdapter implements TelephonyPort {
         statusCallbackMethod: 'POST',
       });
 
-      console.log(`Outbound call initiated to ${call.to} and placed in conference ${call.id} — Twilio SID: ${created.sid}`);
+      this.logger.log(`Outbound call initiated to ${call.to} — Twilio SID: ${created.sid}`);
       return created.sid;
     } catch (error) {
-      console.error('Failed to create call with Twilio:', error);
+      if (error instanceof PsynqException) throw error;
+      throw new TelephonyProviderError(`Failed to create call: ${error.message}`, 'twilio', error);
     }
   }
 
-  async bridgeCall(callId: string, agentId: string): Promise<void> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — bridgeCall will no-op.');
-      return;
-    }
-
-    // Conference name derived from call SID to keep it unique and traceable.
+  async bridgeParticipants(call: Call, targetIdentifier: string, options?: BridgeOptions): Promise<CallParticipant | void> {
+    const orgId = (call as any).organizationId || null;
+    const callId = call.externalId || call.id;
     const conferenceName = `conf_${callId}`;
 
     try {
-      this.logger?.log?.(`Bridging call ${callId} into conference ${conferenceName} for agent ${agentId}`);
+      const { client, config } = await this.getClient(orgId);
+      this.logger.log(`Bridging call ${callId} into conference ${conferenceName} for target ${targetIdentifier}`);
 
-      // 1) Redirect the existing call (callId) into the conference by updating its TwiML.
-      //    This causes the current participant to join the conference.
       const confTwiml = `<Response><Dial><Conference>${conferenceName}</Conference></Dial></Response>`;
-      await this.client.calls(callId).update({ twiml: confTwiml });
+      await client.calls(callId).update({ twiml: confTwiml });
 
-      // 2) Create an outbound call to the agent and have it join the same conference.
-      //    If agentId looks like a phone (starts with +), call the phone number.
-      //    Otherwise, assume it's a Twilio Client identifier (softphone) and dial `client:agentId`.
-      const fromNumber = this.configService.get<string>('TWILIO_PHONE_NUMBER');
-      if (!fromNumber) {
-        throw new Error('TWILIO_PHONE_NUMBER not configured');
-      }
-      const toTarget = agentId && agentId.startsWith('+') ? agentId : `client:${agentId}`;
+      const fromNumber = config.phoneNumber;
+      const toTarget = targetIdentifier && targetIdentifier.startsWith('+') ? targetIdentifier : `client:${targetIdentifier}`;
 
-      const agentCall = await this.client.calls.create({
+      const targetCall = await client.calls.create({
         to: toTarget,
-        from: fromNumber as string,
+        from: fromNumber,
         twiml: `<Response><Dial><Conference>${conferenceName}</Conference></Dial></Response>`,
       });
 
-      this.logger?.log?.(`Agent call created (SID: ${agentCall?.sid}) and joining conference ${conferenceName}`);
-    } catch (error) {
-      this.logger?.error?.(`Failed to bridge call ${callId} to agent ${agentId}: ${error?.message || error}`);
-      // Re-throw to let callers decide how to handle (CallService will propagate or log)
-      throw error;
-    }
+      const participantSid = targetCall.sid;
+      const standardParticipantId = createStandardParticipantId('twilio', call.id, participantSid, { conferenceName, twilioParticipantSid: participantSid });
 
-    /*
-      NOTE: Previous placeholder implementation:
-      // For MVP, simulate bridging by updating call status
-      // In full implementation, use Twilio conferences or transfers
-      console.log(`Bridging call ${callId} to agent ${agentId}`);
-      // Placeholder: Implement via Twilio API if needed
-    */
-  }
-  
-  /**
-   * Generates a unique participant ID for tracking
-   */
-  private generateParticipantId(): string {
-    return `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  async injectSupervisor(callId: string, supervisorId: string, options?: SupervisorControlOptions): Promise<CallParticipant | void> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — injectSupervisor will no-op.');
-      return undefined;
-    }
-
-    const conferenceName = `conf_${callId}`;
-    try {
-      this.logger?.log?.(`Injecting supervisor ${supervisorId} into conference ${conferenceName}`);
-
-      const fromNumber = this.configService.get<string>('TWILIO_PHONE_NUMBER');
-      if (!fromNumber) {
-        throw new Error('TWILIO_PHONE_NUMBER not configured');
-      }
-
-      const toTarget = supervisorId && supervisorId.startsWith('+') ? supervisorId : `client:${supervisorId}`;
-
-      // Create a participant in the conference for the supervisor. We mute the supervisor by default
-      // so they can listen (whisper/barge-in flows can unmute later).
-      const participant = await this.client.conferences(conferenceName).participants.create({
-        from: fromNumber,
-        to: toTarget,
-        muted: options?.initialMuteState !== false, // Default to muted (whisper mode)
-        startConferenceOnEnter: true,
-      });
-
-      // Twilio's participant resource may expose different fields depending on the SDK version.
-      const participantSid = (participant as any).callSid || (participant as any).sid || (participant as any).participantSid;
-      
-      // Create a CallParticipant object to return
-      const callParticipant: CallParticipant = {
-        id: this.generateParticipantId(),
-        callId,
-        participantId: supervisorId,
-        participantType: 'supervisor',
+      const participant = {
+        id: standardParticipantId,
+        callId: call.id,
+        participantId: targetIdentifier,
+        participantType: 'agent' as const,
         providerCallSid: participantSid,
-        providerSpecificData: {
-          conferenceName,
-          twilioParticipantSid: participantSid
-        },
-        isMuted: options?.initialMuteState !== false, // Default to muted (whisper mode)
+        providerSpecificData: { conferenceName, twilioParticipantSid: participantSid, standardParticipantId },
+        isMuted: false,
         isOnHold: false,
         joinedAt: new Date()
       };
-      
-      this.logger?.log?.(`Supervisor injected with participant SID ${participantSid}`);
-      return callParticipant;
+
+      if (this.participantJoinedCallback) {
+        this.participantJoinedCallback(participant);
+      }
+
+      return participant;
     } catch (error) {
-      this.logger?.error?.(`Failed to inject supervisor into call ${callId}: ${error?.message || error}`);
-      throw error;
+      if (error instanceof PsynqException) throw error;
+      throw new TelephonyProviderError(`Failed to bridge participants: ${error.message}`, 'twilio', error);
     }
   }
 
-  async setParticipantMuted(participantId: string, muted: boolean): Promise<void> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — setParticipantMuted will no-op.');
-      return;
-    }
+  async injectSupervisor(call: Call, supervisorId: string, options?: SupervisorControlOptions): Promise<CallParticipant | void> {
+    const orgId = (call as any).organizationId || null;
+    const callId = call.externalId || call.id;
+    const conferenceName = `conf_${callId}`;
 
     try {
-      this.logger?.log?.(`Setting participant ${participantId} muted=${muted}`);
-      
-      // For Twilio, we need to extract the conference name and participant SID from the participantId
-      // In a real implementation, we would look up the participant in our database to get this info
-      // For now, we'll assume the participantId is in the format "conferenceName:participantSid"
+      const { client, config } = await this.getClient(orgId);
+      this.logger.log(`Injecting supervisor ${supervisorId} into conference ${conferenceName}`);
+
+      const fromNumber = config.phoneNumber;
+      const toTarget = supervisorId && supervisorId.startsWith('+') ? supervisorId : `client:${supervisorId}`;
+      const shouldMute = options?.mode === 'whisper' || options?.mode === 'monitor' || options?.initialMuteState === true;
+
+      const participantRaw = await client.conferences(conferenceName).participants.create({
+        from: fromNumber,
+        to: toTarget,
+        muted: shouldMute,
+        startConferenceOnEnter: true,
+      });
+
+      const participantSid = (participantRaw as any).callSid || (participantRaw as any).sid || (participantRaw as any).participantSid;
+      const standardParticipantId = createStandardParticipantId('twilio', callId, participantSid, { conferenceName, twilioParticipantSid: participantSid });
+
+      const participant = {
+        id: standardParticipantId,
+        callId: call.id,
+        participantId: supervisorId,
+        participantType: 'supervisor' as const,
+        providerCallSid: participantSid,
+        providerSpecificData: { conferenceName, twilioParticipantSid: participantSid, standardParticipantId },
+        isMuted: shouldMute,
+        isOnHold: false,
+        joinedAt: new Date()
+      };
+
+      if (this.participantJoinedCallback) {
+        this.participantJoinedCallback(participant);
+      }
+
+      return participant;
+    } catch (error) {
+      if (error instanceof PsynqException) throw error;
+      throw new TelephonyProviderError(`Failed to inject supervisor: ${error.message}`, 'twilio', error);
+    }
+  }
+
+  async setParticipantMuted(orgId: string | null, participantId: string, muted: boolean): Promise<void> {
+    try {
+      const { client } = await this.getClient(orgId);
       const [conferenceName, participantSid] = participantId.split(':');
-      
       if (conferenceName && participantSid) {
-        await this.client.conferences(conferenceName).participants(participantSid).update({ muted });
-        this.logger?.log?.(`Participant ${participantSid} updated (muted=${muted})`);
-      } else {
-        throw new Error(`Invalid participantId format: ${participantId}. Expected format: conferenceName:participantSid`);
+        await client.conferences(conferenceName).participants(participantSid).update({ muted });
       }
     } catch (error) {
-      this.logger?.error?.(`Failed to update participant ${participantId}: ${error?.message || error}`);
-      throw error;
+      if (error instanceof PsynqException) throw error;
+      throw new TelephonyProviderError(`Failed to update participant mute state: ${error.message}`, 'twilio', error);
     }
   }
-  
-  async setParticipantOnHold(participantId: string, onHold: boolean): Promise<void> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — setParticipantOnHold will no-op.');
-      return;
-    }
 
+  async setParticipantOnHold(orgId: string | null, participantId: string, onHold: boolean): Promise<void> {
     try {
-      this.logger?.log?.(`Setting participant ${participantId} onHold=${onHold}`);
-      
-      // For Twilio, we need to extract the conference name and participant SID from the participantId
+      const { client } = await this.getClient(orgId);
       const [conferenceName, participantSid] = participantId.split(':');
-      
       if (conferenceName && participantSid) {
-        await this.client.conferences(conferenceName).participants(participantSid).update({ hold: onHold });
-        this.logger?.log?.(`Participant ${participantSid} updated (onHold=${onHold})`);
-      } else {
-        throw new Error(`Invalid participantId format: ${participantId}. Expected format: conferenceName:participantSid`);
+        await client.conferences(conferenceName).participants(participantSid).update({ hold: onHold });
       }
     } catch (error) {
-      this.logger?.error?.(`Failed to update participant ${participantId}: ${error?.message || error}`);
-      throw error;
+      if (error instanceof PsynqException) throw error;
+      throw new TelephonyProviderError(`Failed to update participant hold state: ${error.message}`, 'twilio', error);
     }
   }
 
-  async endCall(callId: string): Promise<void> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — endCall will no-op.');
-      return;
-    }
-
+  async endCall(call: Call): Promise<void> {
+    const orgId = (call as any).organizationId || null;
+    const callId = call.externalId || call.id;
     try {
-      await this.client.calls(callId).update({ status: 'completed' });
-      console.log(`Call ${callId} ended`);
+      const { client } = await this.getClient(orgId);
+      await client.calls(callId).update({ status: 'completed' });
     } catch (error) {
-      console.error('Failed to end call with Twilio:', error);
+      this.logger.error(`Failed to end call with Twilio: ${error.message}`);
     }
   }
 
-  async findQueueByName(queueName: string): Promise<any> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — findQueueByName will return undefined.');
-      return undefined;
-    }
-
-    const queues = await this.client.queues.list();
-    return queues.find((q: any) => q.friendlyName === queueName);
-  }
-
-  async getFirstCallFromQueue(queueSid: string): Promise<any> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — getFirstCallFromQueue will return undefined.');
-      return undefined;
-    }
-
-    const members = await this.client.queues(queueSid).members.list({ limit: 1 });
-    return members.length > 0 ? members[0] : undefined;
-  }
-
-  async redirectCall(callSid: string, twiml: string): Promise<void> {
-    if (!this.client) {
-      console.warn('Twilio client not configured — redirectCall will no-op.');
-      return;
-    }
-
+  async findQueueByName(queueName: string): Promise<any | null> {
     try {
-      await this.client.calls(callSid).update({ twiml });
-      console.log(`Redirected call ${callSid}`);
+      const { client } = await this.getClient(null);
+      const queues = await client.queues.list();
+      return queues.find((q: any) => q.friendlyName === queueName) || null;
     } catch (error) {
-      console.error(`Failed to redirect call ${callSid}:`, error);
+      return null;
     }
   }
 
-  async getRecording(callId: string): Promise<import('stream').Readable | null> {
-    // Twilio recording retrieval implementation pending; return null for now
-    this.logger.warn('getRecording not implemented for Twilio');
+  async getFirstCallFromQueue(queueSid: string): Promise<any | null> {
+    try {
+      const { client } = await this.getClient(null);
+      const members = await client.queues(queueSid).members.list({ limit: 1 });
+      return members.length > 0 ? members[0] : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  async redirectCall(call: Call, target: string): Promise<void> {
+    const orgId = (call as any).organizationId || null;
+    const callSid = call.externalId || call.id;
+    try {
+      const { client } = await this.getClient(orgId);
+      await client.calls(callSid).update({ twiml: target });
+    } catch (error) {
+      throw new TelephonyProviderError(`Failed to redirect call: ${error.message}`, 'twilio', error);
+    }
+  }
+
+  onCallReceived(callback: (call: Call) => void): void { this.callReceivedCallback = callback; }
+  onCallEnded(callback: (callId: string) => void): void { this.callEndedCallback = callback; }
+  onParticipantJoined(callback: (participant: CallParticipant) => void): void { this.participantJoinedCallback = callback; }
+
+  async getRecording(callId: string): Promise<Readable | null> {
     return null;
   }
 }

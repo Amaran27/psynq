@@ -3,42 +3,48 @@ import { Readable } from 'stream';
 export interface StoragePort {
   /**
    * Uploads a file to storage.
-   * @param key - Unique key for the file (e.g., 'recordings/call-123.wav')
+   * @param organizationId - Tenant ID for config resolution
+   * @param key - Unique key for the file
    * @param stream - Readable stream of the file content
    * @param contentType - MIME type of the file
    * @param metadata - Optional metadata
    */
-  upload(key: string, stream: Readable, contentType: string, metadata?: Record<string, string>): Promise<void>;
+  upload(organizationId: string | null, key: string, stream: Readable, contentType: string, metadata?: Record<string, string>): Promise<void>;
 
   /**
    * Generates a signed URL for secure access to a file.
+   * @param organizationId - Tenant ID for config resolution
    * @param key - File key
    * @param expiresInSeconds - URL expiration time
    * @param operation - 'GET' for download, 'PUT' for upload
    */
-  getSignedUrl(key: string, expiresInSeconds: number, operation: 'GET' | 'PUT'): Promise<string>;
+  getSignedUrl(organizationId: string | null, key: string, expiresInSeconds: number, operation: 'GET' | 'PUT'): Promise<string>;
 
   /**
    * Deletes a file from storage.
+   * @param organizationId - Tenant ID for config resolution
    * @param key - File key
    */
-  delete(key: string): Promise<void>;
+  delete(organizationId: string | null, key: string): Promise<void>;
 
   /**
    * Lists files with a prefix.
-   * @param prefix - Key prefix (e.g., 'recordings/')
+   * @param organizationId - Tenant ID for config resolution
+   * @param prefix - Key prefix
    */
-  list(prefix: string): Promise<string[]>;
+  list(organizationId: string | null, prefix: string): Promise<string[]>;
 
   /**
    * Checks if storage is healthy.
+   * @param organizationId - Tenant ID for config resolution
    */
-  healthCheck(): Promise<boolean>;
+  healthCheck(organizationId: string | null): Promise<boolean>;
 
   /**
-   * Applies lifecycle policies (e.g., delete old files).
+   * Applies lifecycle policies.
+   * @param organizationId - Tenant ID for config resolution
    * @param prefix - Prefix for files to manage
    * @param olderThanDays - Delete files older than this many days
    */
-  applyLifecyclePolicy(prefix: string, olderThanDays: number): Promise<void>;
+  applyLifecyclePolicy(organizationId: string | null, prefix: string, olderThanDays: number): Promise<void>;
 }

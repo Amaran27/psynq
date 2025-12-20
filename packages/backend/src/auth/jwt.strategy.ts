@@ -17,6 +17,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // The payload is the decrypted token.
     // We can do further validation here, e.g., check if user exists in DB.
     // For now, we'll trust the token is valid if it was signed with our secret.
-    return { userId: payload.sub, username: payload.username, roles: payload.roles };
+    return { 
+      userId: payload.sub, 
+      username: payload.username, 
+      roles: payload.roles,
+      organizationId: payload.orgId 
+    };
   }
 }

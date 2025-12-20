@@ -1,0 +1,1 @@
+SELECT id, "from", "to", state, "externalId", "startedAt" FROM calls ORDER BY "startedAt" DESC LIMIT 5;

@@ -1,50 +1,40 @@
-import { Controller, Post, Body, Res, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, Res, UseGuards, Request, Options } from '@nestjs/common';
 import type { Response } from 'express';
 import twilio from 'twilio';
-import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SettingsService } from '../services/settings.service';
 
 @Controller('twilio')
 export class TwilioVoiceController {
-  private readonly twilioClient: twilio.Twilio;
-  private readonly accountSid: string;
-  private readonly apiKey: string;
-  private readonly apiSecret: string;
-  private readonly twimlAppSid: string;
+  constructor(private readonly settingsService: SettingsService) {}
 
-  constructor(private readonly configService: ConfigService) {
-    this.accountSid = this.configService.get('TWILIO_ACCOUNT_SID') || '';
-    this.apiKey = this.configService.get('TWILIO_API_KEY') || '';
-    this.apiSecret = this.configService.get('TWILIO_API_SECRET') || '';
-    this.twimlAppSid = this.configService.get('TWILIO_TWIML_APP_SID') || '';
-    
-    if (this.apiKey && this.apiSecret) {
-      this.twilioClient = twilio(this.apiKey, this.apiSecret, { accountSid: this.accountSid });
-    }
+  private async getConfig(orgId: string | null) {
+    const config = await this.settingsService.getSetting(orgId, 'telephony.twilio.config', true);
+    return config || {};
+  }
+
+  // Allow preflight (OPTIONS) requests for this route (helps when browser sends
+  // Authorization header and triggers a CORS preflight).
+  @Options('token')
+  handleTokenOptions() {
+    return; // CORS middleware will set the appropriate headers
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('token')
   async generateToken(@Request() req, @Res() res: Response) {
-    console.log('Generate token request received');
-    const agentId = req.user?.userId; // Get user ID from the validated JWT payload
-    console.log(`Agent ID from token: ${agentId}`);
+    const agentId = req.user?.userId;
+    const orgId = req.user?.organizationId || null;
 
     if (!agentId) {
-      console.error('Agent ID missing in request user object');
       return res.status(400).json({ error: 'User ID missing' });
     }
 
-    console.log('Twilio Config:', {
-      accountSid: this.accountSid ? 'Set' : 'Missing',
-      apiKey: this.apiKey ? 'Set' : 'Missing',
-      apiSecret: this.apiSecret ? 'Set' : 'Missing',
-      twimlAppSid: this.twimlAppSid ? 'Set' : 'Missing',
-    });
+    const config = await this.getConfig(orgId);
+    const { accountSid, apiKey, apiSecret, twimlAppSid } = config;
 
-    if (!this.accountSid || !this.apiKey || !this.apiSecret || !this.twimlAppSid) {
-      console.warn('Twilio credentials missing. Returning dummy token for development.');
-      // Return a dummy token for development purposes if credentials are missing
+    if (!accountSid || !apiKey || !apiSecret || !twimlAppSid || !accountSid.startsWith('AC')) {
+      console.warn('Twilio credentials missing or invalid. Returning dummy token for development.');
       return res.json({
         identity: agentId,
         token: 'dummy_token_for_development',
@@ -53,14 +43,14 @@ export class TwilioVoiceController {
 
     try {
       const token = new twilio.jwt.AccessToken(
-        this.accountSid,
-        this.apiKey,
-        this.apiSecret,
-        { identity: agentId } // Use the authenticated user's ID as the identity
+        accountSid,
+        apiKey,
+        apiSecret,
+        { identity: agentId }
       );
 
       const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
-        outgoingApplicationSid: this.twimlAppSid,
+        outgoingApplicationSid: twimlAppSid,
         incomingAllow: true,
       });
 

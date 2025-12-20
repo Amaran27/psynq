@@ -12,13 +12,37 @@ export interface CallParticipant {
 }
 
 export interface SupervisorControlOptions {
+
   /**
+
    * Initial mute state for supervisor (true = whisper mode, false = barge-in mode)
+
    */
+
   initialMuteState?: boolean;
+
   
+
   /**
-   * Whether supervisor can hear the conversation when muted
+
+   * Supervisor mode: 'barge' (speak to all), 'whisper' (speak to agent only), 'monitor' (listen only).
+
+   * Defaults to 'monitor' if initialMuteState is true, or 'barge' if false?
+
+   * Explicit mode is better.
+
    */
+
+  mode?: 'barge' | 'whisper' | 'monitor';
+
+
+
+  /**
+
+   * Whether supervisor can hear the conversation when muted
+
+   */
+
   canHearWhenMuted?: boolean;
+
 }

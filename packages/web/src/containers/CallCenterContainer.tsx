@@ -43,6 +43,7 @@ export function CallCenterContainer() {
     loadInitialAuth,
     updateAgentStatus,
     fetchAgentStatus,
+    isAuthenticated,
   } = useAuthStore();
 
   const { initializeAdapter, apiAdapter } = useAdapterStore();
@@ -69,13 +70,26 @@ export function CallCenterContainer() {
     if (isLoggedIn && token && user && apiAdapter) {
       (async () => {
         try {
-          initializeTelephony(user.id, token);
+          // Check if token is still valid before initializing
+          if (!isAuthenticated()) {
+            console.warn('Token is expired, logging out');
+            logout();
+            return;
+          }
+          
+          console.log('Initializing telephony services...');
+          await initializeTelephony(user.id, token);
           await loadActiveCalls(token);
           // Start background polling so we pick up status changes even if webhooks arrive while offline
           useCallStore.getState().startPolling(token);
           await fetchAgentStatus();
+          console.log('Telephony services initialized successfully');
         } catch (err) {
           console.error('Initialization failed:', err);
+          // If authentication error, logout
+          if (err instanceof Error && err.message.includes('expired')) {
+            logout();
+          }
         }
       })();
 

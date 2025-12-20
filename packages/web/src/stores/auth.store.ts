@@ -4,7 +4,7 @@ import { AgentStatus } from '@psynq/core';
 
 interface AuthState {
   isLoggedIn: boolean;
-  user: { id: string; username: string; roles: string[] } | null;
+  user: { id: string; username: string; roles: string[]; organizationId?: string } | null;
   token: string | null;
   status: AgentStatus; // Agent status
   isLoading: boolean;
@@ -18,6 +18,7 @@ interface AuthActions {
   loadInitialAuth: () => void;
   updateAgentStatus: (status: AgentStatus) => Promise<void>;
   fetchAgentStatus: () => Promise<void>;
+  isAuthenticated: () => boolean;
 }
 
 let apiAdapter: CallApiPort | null = null;
@@ -68,6 +69,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         id: decodedToken.sub,
         username: decodedToken.username,
         roles: decodedToken.roles,
+        organizationId: decodedToken.orgId,
       };
 
       if (typeof window !== 'undefined') {
@@ -135,6 +137,24 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         isLoading: false,
       });
       throw error;
+    }
+  },
+
+  isAuthenticated: () => {
+    const { token } = get();
+    if (!token || !apiAdapter) return false;
+    
+    try {
+      const decoded = apiAdapter.decodeToken(token);
+      const now = Date.now() / 1000;
+      if (decoded.exp && decoded.exp < now) {
+        console.warn('Token expired:', new Date(decoded.exp * 1000));
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Error checking authentication:', err);
+      return false;
     }
   },
 }));

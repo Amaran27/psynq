@@ -1,11 +1,15 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
 import { CallService } from '../services/call.service';
-import twilio from 'twilio';
+import { TwilioWebhookAdapter } from '../adapters/webhooks/twilio-webhook.adapter';
 
 @Controller('webhooks')
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);
-  constructor(private readonly callService: CallService) {}
+  
+  constructor(
+    private readonly callService: CallService,
+    private readonly twilioWebhookAdapter: TwilioWebhookAdapter
+  ) {}
 
   @Post('twilio/voice')
   async handleTwilioVoice(@Body() twilioPayload: any): Promise<any> {
@@ -19,22 +23,30 @@ export class WebhookController {
       this.logger.error('Error handling Twilio status callback', err?.stack || err?.message || err);
     });
 
-    // The Voice webhook (when Twilio expects TwiML instructions) will often be for inbound calls.
-    // If this is an inbound call ringing event, instruct Twilio to enqueue the caller.
-    const twiml = new twilio.twiml.VoiceResponse();
-
-    // If Twilio is requesting instructions for an inbound ringing call, respond with enqueue.
-    // If not (e.g., this is a status callback), returning an empty 200 is fine.
-    const isInbound = twilioPayload.Direction === 'inbound' || twilioPayload.To?.includes(process.env.TWILIO_PHONE_NUMBER || '');
-    const status = (twilioPayload.CallStatus || '').toLowerCase();
-
-    if (isInbound && status === 'ringing') {
-      twiml.say('Thank you for calling. Please wait for the next available agent.');
-      twiml.enqueue('support');
-      return twiml.toString();
+    // Process the webhook using our adapter
+    const standardEvent = await this.twilioWebhookAdapter.processWebhook(twilioPayload);
+    
+    if (standardEvent) {
+      // Handle the standardized event in the CallService
+      await this.callService.handleStandardWebhookEvent(standardEvent).catch(err => {
+        this.logger.error('Error handling webhook event', err?.stack || err?.message || err);
+      });
+      
+      // Generate the appropriate response
+      const response = await this.twilioWebhookAdapter.generateResponse(standardEvent);
+      
+      if (response) {
+        this.logger.debug('Returning TwiML response');
+        return response;
+      }
     }
 
-    // For status callbacks and other events, Twilio just needs a 200 OK.
+    // For backward compatibility, also call the legacy handler
+    await this.callService.handleTwilioStatusCallback(twilioPayload).catch(err => {
+      this.logger.error('Error handling Twilio status callback', err?.stack || err?.message || err);
+    });
+
+    // Default empty response for status callbacks and other events
     return '';
   }
 }

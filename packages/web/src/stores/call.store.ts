@@ -47,12 +47,24 @@ export const useCallStore = create<CallStore>((set, get) => ({
 
   // Initialize Telephony Service
   initializeTelephony: async (agentId: string, authToken: string) => {
+    console.log('Initializing telephony service for agent:', agentId);
+    console.log('Auth token provided:', authToken ? 'Yes' : 'No');
+    
     const { apiAdapter } = useAdapterStore.getState(); // Get adapter from central store
     if (!apiAdapter) {
       set({ error: 'API adapter not initialized' });
       return;
     }
-    if (get().telephonyService) return; // Only initialize once
+    
+    if (!authToken) {
+      set({ error: 'No authentication token provided for telephony initialization' });
+      return;
+    }
+    
+    if (get().telephonyService) {
+      console.log('Telephony service already initialized');
+      return;
+    }
 
     const telephonyService = new TelephonyService(apiAdapter);
 
