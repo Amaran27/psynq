@@ -1,5 +1,7 @@
 export enum AgentStatus {
   AVAILABLE = 'available',
-  ON_CALL = 'on_call',
-  AWAY = 'away',
+  BUSY = 'busy',
+  BREAK = 'break',
+  WRAP_UP = 'wrap_up',
+  OFFLINE = 'offline',
 }

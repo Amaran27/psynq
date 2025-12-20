@@ -42,7 +42,7 @@ export class CallEntity {
   externalId?: string;
 
   @Column({ nullable: true })
-  parentCallSid?: string;
+  externalParentId?: string;
 
   @Column({ type: 'jsonb', nullable: true })
   providerMetadata?: Record<string, any>;

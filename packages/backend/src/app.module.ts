@@ -5,7 +5,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppConfigService } from './config/app.config.service';
-import { TwilioModule } from './twilio/twilio.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { CallEntity } from './entities/call.entity';
 import { UserEntity } from './entities/user.entity';
@@ -16,13 +15,18 @@ import { AuthModule } from './auth/auth.module';
 import { CallModule } from './call/call.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { AsteriskModule } from './modules/asterisk/asterisk.module';
+import { EventBusModule } from './modules/event-bus/event-bus.module';
+import { TranscriptionModule } from './modules/transcription/transcription.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
-import { MediasoupModule } from './modules/mediasoup/mediasoup.module';
 import { TenantInterceptor } from './auth/tenant.interceptor';
 import { SettingsController } from './settings.controller';
 import { SettingsModule } from './modules/settings.module';
 import { OrganizationModule } from './modules/organization/organization.module';
 import { OrganizationEntity } from './entities/organization.entity';
+import { QueueEntity } from './entities/queue.entity';
+import { FlowEntity } from './entities/flow.entity';
+import { WalletEntity } from './entities/wallet.entity';
+import { RateEntity } from './entities/rate.entity';
 
 @Module({
   imports: [
@@ -39,7 +43,7 @@ import { OrganizationEntity } from './entities/organization.entity';
         username: configService.get<string>('DB_USERNAME') || 'psynq_user',
         password: configService.get<string>('DB_PASSWORD') || 'mysecretpassword',
         database: configService.get<string>('DB_DATABASE') || 'psynq_db',
-        entities: [CallEntity, UserEntity, CallParticipantEntity, RecordingEntity, SettingEntity, OrganizationEntity],
+        entities: [CallEntity, UserEntity, CallParticipantEntity, RecordingEntity, SettingEntity, OrganizationEntity, QueueEntity, FlowEntity, WalletEntity, RateEntity],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
         migrationsRun: configService.get<string>('RUN_MIGRATIONS_ON_START') === 'true',
@@ -47,11 +51,12 @@ import { OrganizationEntity } from './entities/organization.entity';
       inject: [ConfigService],
     }),
     TypeOrmModule.forFeature([UserEntity]),
-    TwilioModule,
     AuthModule,
     CallModule,
     StorageModule,
     AsteriskModule,
+    EventBusModule,
+    TranscriptionModule,
     MonitoringModule,
     WebhookModule,
     SettingsModule,

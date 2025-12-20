@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useCallStore } from '../stores/call.store';
 import { useAuthStore } from '../stores/auth.store';
 import { useAdapterStore } from '../stores/adapter.store';
 import { CallCenterView } from '../components/CallCenterView';
 import { LoginScreen } from '../components/LoginScreen';
-import { AgentStatusSelector } from '../components/AgentStatusSelector';
-import { AgentStatus, Call } from '@psynq/core';
+import { AgentStatus, Call, CallState } from '@psynq/core';
 
 export function CallCenterContainer() {
   const {
@@ -16,9 +15,6 @@ export function CallCenterContainer() {
     isLoading: callsLoading,
     error: callsError,
     activeCallsCount,
-    ringingCallsCount,
-    answeredCallsCount,
-    onHoldCallsCount,
     initializeTelephony,
     loadActiveCalls,
     createCall,
@@ -29,6 +25,7 @@ export function CallCenterContainer() {
     selectCall,
     updateCall,
     addCall,
+    tips,
   } = useCallStore();
 
   const {
@@ -53,7 +50,7 @@ export function CallCenterContainer() {
     initializeAdapter();
   }, [initializeAdapter]);
 
-  // Set API adapter in auth store as soon as it's available
+  // Set API adapter in auth store
   useEffect(() => {
     if (apiAdapter) {
       useAuthStore.getState().setApiAdapter(apiAdapter);
@@ -65,35 +62,24 @@ export function CallCenterContainer() {
     loadInitialAuth();
   }, [loadInitialAuth]);
 
-  // Once authenticated, initialize telephony and subscriptions
+  // Once authenticated, initialize telephony
   useEffect(() => {
     if (isLoggedIn && token && user && apiAdapter) {
       (async () => {
         try {
-          // Check if token is still valid before initializing
           if (!isAuthenticated()) {
-            console.warn('Token is expired, logging out');
             logout();
             return;
           }
           
-          console.log('Initializing telephony services...');
           await initializeTelephony(user.id, token);
           await loadActiveCalls(token);
-          // Start background polling so we pick up status changes even if webhooks arrive while offline
-          useCallStore.getState().startPolling(token);
           await fetchAgentStatus();
-          console.log('Telephony services initialized successfully');
         } catch (err) {
           console.error('Initialization failed:', err);
-          // If authentication error, logout
-          if (err instanceof Error && err.message.includes('expired')) {
-            logout();
-          }
         }
       })();
 
-      // Setup WebSocket subscriptions when authenticated
       const unsubscribeUpdates = apiAdapter.subscribeToCallUpdates((updatedCall: Call) => {
         updateCall(updatedCall);
       }, token);
@@ -105,10 +91,9 @@ export function CallCenterContainer() {
       return () => {
         unsubscribeUpdates();
         unsubscribeNewCalls();
-        useCallStore.getState().stopPolling();
       };
     }
-  }, [isLoggedIn, token, user, apiAdapter, initializeTelephony, loadActiveCalls, fetchAgentStatus, updateCall, addCall]);
+  }, [isLoggedIn, token, user, apiAdapter, initializeTelephony, loadActiveCalls, fetchAgentStatus, updateCall, addCall, isAuthenticated, logout]);
 
   const handleLogin = async (username: string, password: string) => {
     try {
@@ -120,21 +105,6 @@ export function CallCenterContainer() {
 
   const handleAnswerCall = async (callId: string) => {
     if (!token || !user?.id) return;
-
-    // Ensure there is an active incoming connection matching this call
-    const { incomingConnection } = useCallStore.getState();
-    const connectionCallSid = incomingConnection?.parameters?.CallSid;
-    if (!incomingConnection || connectionCallSid !== callId) {
-      console.warn('Attempted to answer call without an active incoming connection', { callId, connectionCallSid });
-      // Optionally, attempt to refresh call state from backend instead of throwing
-      try {
-        await useCallStore.getState().loadActiveCalls(token);
-      } catch (err) {
-        console.error('Failed to refresh calls after missing connection:', err);
-      }
-      return;
-    }
-
     try {
       await answerCall(callId, user.id, token);
     } catch (err) {
@@ -176,7 +146,7 @@ export function CallCenterContainer() {
   const handleCreateCall = async (to: string) => {
     if (!token) return;
     try {
-      const from = process.env.NEXT_PUBLIC_TWILIO_FROM_NUMBER || 'default_from_number';
+      const from = 'system'; // Or agent specific number
       await createCall(from, to, token);
     } catch (err) {
       console.error('Failed to create call:', err);
@@ -200,13 +170,14 @@ export function CallCenterContainer() {
     <CallCenterView
       calls={calls}
       currentCall={currentCall}
+      tips={tips}
       isLoading={callsLoading || authLoading}
       error={callsError || authError}
       stats={{
         activeCalls: activeCallsCount,
-        ringingCalls: ringingCallsCount,
-        answeredCalls: answeredCallsCount,
-        onHoldCalls: onHoldCallsCount,
+        ringingCalls: calls.filter(c => c.state === CallState.RINGING).length,
+        answeredCalls: calls.filter(c => c.state === CallState.ANSWERED).length,
+        onHoldCalls: calls.filter(c => c.state === CallState.ON_HOLD).length,
       }}
       agentStatus={agentStatus}
       onUpdateAgentStatus={handleUpdateAgentStatus}

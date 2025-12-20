@@ -11,6 +11,9 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "dependencies": {
+    "class-transformer": "^0.5.1"
+  },
   "devDependencies": {
     "@types/node": "^25.0.1",
     "typescript": "^5.9.3"

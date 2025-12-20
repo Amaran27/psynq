@@ -1,30 +1,33 @@
-'use client';
-
 import React from 'react';
 import { AgentStatus } from '@psynq/core';
 
 interface AgentStatusSelectorProps {
   currentStatus: AgentStatus;
   onStatusChange: (newStatus: AgentStatus) => void;
-  isLoading: boolean;
+  disabled?: boolean;
 }
 
-export function AgentStatusSelector({ currentStatus, onStatusChange, isLoading }: AgentStatusSelectorProps) {
-  const statusOptions = Object.values(AgentStatus);
+const statusColors: Record<AgentStatus, string> = {
+  [AgentStatus.AVAILABLE]: 'bg-green-500',
+  [AgentStatus.BUSY]: 'bg-red-500',
+  [AgentStatus.BREAK]: 'bg-yellow-500',
+  [AgentStatus.WRAP_UP]: 'bg-blue-500',
+  [AgentStatus.OFFLINE]: 'bg-gray-500',
+};
 
+export function AgentStatusSelector({ currentStatus, onStatusChange, disabled }: AgentStatusSelectorProps) {
   return (
-    <div className="flex items-center space-x-2">
-      <label htmlFor="agent-status" className="text-sm text-gray-600">Status:</label>
+    <div className="flex items-center space-x-3 p-2 bg-white rounded-lg shadow-sm border border-gray-100">
+      <div className={`w-3 h-3 rounded-full ${statusColors[currentStatus] || 'bg-gray-400'}`} />
       <select
-        id="agent-status"
-        className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600 text-sm"
+        className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none disabled:opacity-50"
         value={currentStatus}
         onChange={(e) => onStatusChange(e.target.value as AgentStatus)}
-        disabled={isLoading}
+        disabled={disabled}
       >
-        {statusOptions.map((status) => (
+        {Object.values(AgentStatus).map((status) => (
           <option key={status} value={status}>
-            {status.replace(/_/g, ' ')}
+            {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
           </option>
         ))}
       </select>

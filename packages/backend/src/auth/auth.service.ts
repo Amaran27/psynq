@@ -83,12 +83,8 @@ export class AuthService {
    * @param status - The new status to set.
    */
   async updateStatus(userId: string, status: AgentStatus): Promise<UserEntity> {
-    await this.userRepository.update(userId, { status });
+    await this.userRepository.update(userId, { status, lastStatusChangedAt: new Date() });
     const updatedUser = await this.userRepository.findOneBy({ id: userId });
-
-    if (status === AgentStatus.AVAILABLE) {
-      await this.callService.findCallForAgent(userId);
-    }
 
     if (!updatedUser) {
       throw new Error('User not found after update');

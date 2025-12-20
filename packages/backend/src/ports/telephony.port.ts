@@ -7,13 +7,23 @@ import { TelephonyCapabilities } from '../interfaces/telephony-capabilities.inte
 
 export interface TelephonyPort {
   /**
+   * Generates a provider-specific token or credentials for a client/agent.
+   */
+  generateToken(organizationId: string | null, agentId: string): Promise<any>;
+
+  /**
+   * Performs a health check on the telephony provider.
+   */
+  healthCheck(organizationId: string | null): Promise<boolean>;
+
+  /**
    * Return provider capabilities so callers can adapt behavior instead
    * of branching on provider names.
    */
   getCapabilities(): TelephonyCapabilities;
 
   /**
-   * Initiates an outbound call. Implementations may return the provider's external call ID (e.g., Twilio SID).
+   * Initiates an outbound call. Implementations may return the provider's external call ID (e.g., ARI channel ID).
    */
   createCall(call: Call): Promise<string | void>;
   
@@ -46,6 +56,46 @@ export interface TelephonyPort {
   setParticipantOnHold(organizationId: string | null, participantId: string, onHold: boolean): Promise<void>;
   
   /**
+   * Dial the second leg of a call and join it to a bridge.
+   */
+  dialLegB(organizationId: string | null, callId: string, bridgeId: string, destination: string): Promise<void>;
+
+  /**
+   * Joins a channel to a bridge.
+   */
+  joinBridge(organizationId: string | null, bridgeId: string, channelId: string): Promise<void>;
+
+  /**
+   * Starts recording a bridge.
+   */
+  startBridgeRecording(organizationId: string | null, bridgeId: string, callId: string): Promise<void>;
+
+  /**
+   * Stops recording a bridge and uploads it.
+   */
+  stopBridgeRecording(organizationId: string | null, bridgeId: string, callId: string): Promise<void>;
+
+  /**
+   * Plays an audio file to a channel.
+   */
+  playAudio(organizationId: string | null, callId: string, url: string): Promise<void>;
+
+  /**
+   * Uses Text-to-Speech to speak to a channel.
+   */
+  sayText(organizationId: string | null, callId: string, text: string): Promise<void>;
+
+  /**
+   * Starts gathering DTMF digits from a channel.
+   */
+  gatherDigits(organizationId: string | null, callId: string, options: { maxDigits: number, timeout: number, finishOnKey: string }): Promise<void>;
+
+  /**
+   * Forks the audio of a channel to an external RTP destination.
+   */
+  forkAudio(organizationId: string | null, callId: string, destination: string): Promise<void>;
+
+  /**
    * Ends a call and disconnects all participants.
    */
   endCall(call: Call): Promise<void>;
@@ -55,18 +105,6 @@ export interface TelephonyPort {
    * Returns null if no recording exists.
    */
   getRecording(callId: string): Promise<Readable | null>;
-  
-  /**
-   * Finds a queue by name. Only applicable for providers that support queues.
-   * Returns null for providers that don't support queues.
-   */
-  findQueueByName?(queueName: string): Promise<any | null>;
-  
-  /**
-   * Gets the first call from a queue. Only applicable for providers that support queues.
-   * Returns null for providers that don't support queues or if queue is empty.
-   */
-  getFirstCallFromQueue?(queueSid: string): Promise<any | null>;
 
   /**
    * Registers a callback for when a call is received (e.g. via WebSocket).

@@ -26,4 +26,5 @@ export interface CallApiPort {
   // Real-time subscriptions
   subscribeToCallUpdates(callback: (call: Call) => void, token: string): () => void;
   subscribeToNewCalls(callback: (call: Call) => void, token: string): () => void;
+  subscribeToIntelligenceEvents(callback: (event: any) => void, token: string): () => void;
 }

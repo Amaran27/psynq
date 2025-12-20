@@ -18,18 +18,22 @@ import { CallModule } from '../call/call.module';
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'defaultSecretKey',
-        signOptions: {
-          expiresIn: '1d',
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        if (!secret) throw new Error('JWT_SECRET environment variable is missing');
+        return {
+          secret,
+          signOptions: {
+            expiresIn: '1d',
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     forwardRef(() => CallModule), // Resolve circular dependency with CallModule
   ],
   controllers: [AuthController],
   providers: [AuthService, LocalStrategy, JwtStrategy],
-  exports: [AuthService, PassportModule],
+  exports: [AuthService, PassportModule, JwtModule],
 })
 export class AuthModule {}

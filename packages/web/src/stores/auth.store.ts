@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { create } from 'zustand';
 import { CallApiPort } from '../ports/call-api.port';
 import { AgentStatus } from '@psynq/core';
@@ -28,7 +29,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isLoggedIn: false,
   user: null,
   token: null,
-  status: AgentStatus.AWAY, // Default status
+  status: AgentStatus.OFFLINE, // Default status
   isLoading: false,
   error: null,
 
@@ -44,13 +45,30 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       const token = localStorage.getItem('jwt_token');
       const user = localStorage.getItem('user_data');
       if (token && user) {
+        // Verify token expiration locally before trusting it
+        try {
+          const decoded = apiAdapter?.decodeToken(token);
+          const now = Date.now() / 1000;
+          if (decoded && decoded.exp && decoded.exp < now) {
+            console.warn('Stale token found in localStorage, clearing...');
+            get().logout();
+            return;
+          }
+        } catch (e) {
+          get().logout();
+          return;
+        }
+
         set({
           isLoggedIn: true,
           token: token,
           user: JSON.parse(user),
         });
         // Also fetch agent status when re-loading session
-        get().fetchAgentStatus();
+        get().fetchAgentStatus().catch(() => {
+          // If fetch fails (e.g. 401), logout automatically
+          get().logout();
+        });
       }
     }
   },
@@ -99,7 +117,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       localStorage.removeItem('jwt_token');
       localStorage.removeItem('user_data');
     }
-    set({ isLoggedIn: false, user: null, token: null, status: AgentStatus.AWAY });
+    set({ isLoggedIn: false, user: null, token: null, status: AgentStatus.OFFLINE });
   },
 
   updateAgentStatus: async (newStatus: AgentStatus) => {

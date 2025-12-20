@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Inject } from '@nestjs/common';
 import { TelephonyPort } from '../ports/telephony.port';
 import { Call, CallState } from '@psynq/core';
 import { TelephonyCapabilities } from '../interfaces/telephony-capabilities.interface';
@@ -10,52 +10,63 @@ import { createStandardParticipantId } from '../utils/participant-id.util';
 import { SettingsService } from '../services/settings.service';
 import { Readable } from 'stream';
 import { PsynqException, TelephonyProviderError, ConfigurationMissingError } from '../common/exceptions/psynq.exception';
+import { EventBusPort } from '../ports/event-bus.port';
 
 @Injectable()
-export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
+export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AsteriskAdapter.name);
-  private client: ari.Client | null = null;
+  private clients: Map<string, ari.Client> = new Map();
   private callReceivedCallback: ((call: Call) => void) | null = null;
   private callEndedCallback: ((callId: string) => void) | null = null;
   private participantJoinedCallback: ((participant: CallParticipant) => void) | null = null;
-  private recordings: Map<string, ari.StoredRecording> = new Map();
-  private channelOrgMap: Map<string, string> = new Map();
+  private recordings: Map<string, ari.LiveRecording> = new Map();
 
   constructor(
     private readonly storageService: StorageService,
-    private readonly settingsService: SettingsService
+    private readonly settingsService: SettingsService,
+    @Inject('EVENT_BUS') private readonly eventBus: EventBusPort,
   ) {}
 
   async onModuleInit() {
-    this.connectToAsterisk(null).catch(error => {
-      this.logger.error('Failed to connect to system-default Asterisk ARI:', error);
-    });
+    this.logger.log('AsteriskAdapter initialized in multi-tenant mode.');
   }
 
-  async healthCheck(orgId: string | null): Promise<boolean> {
-    if (!this.client) return false;
-    try {
-      const channels = await this.client.channels.list();
-      return Array.isArray(channels);
-    } catch (err) {
-      return false;
+  async onModuleDestroy() {
+    for (const [key, client] of this.clients) {
+      this.logger.log(`Closing Asterisk connection for: ${key}`);
     }
   }
 
-  private async connectToAsterisk(orgId: string | null) {
+  private async getClient(orgId: string | null): Promise<ari.Client> {
+    const key = orgId || 'system-default';
+    if (this.clients.has(key)) {
+      return this.clients.get(key)!;
+    }
+
     try {
       const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config', true);
-      if (!config) return;
+      if (!config) {
+        throw new ConfigurationMissingError('telephony.asterisk.config', orgId);
+      }
 
       const ariUrl = config.url || 'http://127.0.0.1:8088';
       const ariUser = config.username || 'psynq';
       const ariPass = config.password || 'asterisk';
       
-      this.client = await ari.connect(ariUrl, ariUser, ariPass);
-      this.client.on('StasisStart', (event, channel) => this.handleIncomingCall(channel));
-      this.client.on('ChannelHangup', (event, channel) => this.handleCallHangup(channel));
+      const client = await ari.connect(ariUrl, ariUser, ariPass);
       
-      this.client.on('ChannelEnteredBridge', (event, { bridge, channel }) => {
+      client.on('StasisStart', (event, channel) => this.handleIncomingCall(orgId, channel));
+      client.on('ChannelHangup', (event, channel) => this.handleCallHangup(orgId, channel));
+      client.on('ChannelDtmfReceived', (event, channel) => {
+        this.eventBus.publish({
+          type: 'telephony.dtmf_received',
+          organizationId: orgId || 'system',
+          payload: { callId: channel.id, digit: event.digit },
+          timestamp: new Date()
+        });
+      });
+      
+      client.on('ChannelEnteredBridge', (event, { bridge, channel }) => {
           if (this.participantJoinedCallback) {
               const callId = channel.variables?.CALL_ID || bridge.id.replace('bridge-', '');
               const participantId = channel.caller?.number || channel.id;
@@ -74,10 +85,35 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
           }
       });
 
-      this.client.start(config.app || 'psynq-app');
-      this.logger.log(`Connected to Asterisk ARI at ${ariUrl} for org ${orgId || 'system'}`);
+      client.start(config.app || 'psynq-app');
+      this.clients.set(key, client);
+      this.logger.log(`Connected to Asterisk ARI for org: ${key}`);
+      return client;
     } catch (e) {
-        this.logger.warn(`Failed to connect to Asterisk for org ${orgId || 'system'}: ${e.message}`);
+      this.logger.error(`Failed to connect to Asterisk for org ${orgId || 'system'}: ${e.message}`);
+      throw new TelephonyProviderError(`Asterisk connection failed for ${key}`, 'asterisk', e);
+    }
+  }
+
+  async generateToken(orgId: string | null, agentId: string): Promise<any> {
+    const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config', true);
+    
+    return {
+      provider: 'asterisk',
+      server: config?.webrtc_uri || process.env.ASTERISK_WEBRTC_URI || `wss://asterisk.psynq.com:8089/ws`,
+      user: agentId,
+      sip_uri: `sip:${agentId}@${config?.domain || 'asterisk.psynq.com'}`,
+      password: config?.password || 'agent-password',
+    };
+  }
+
+  async healthCheck(orgId: string | null): Promise<boolean> {
+    try {
+      const client = await this.getClient(orgId);
+      const channels = await client.channels.list();
+      return Array.isArray(channels);
+    } catch (err) {
+      return false;
     }
   }
 
@@ -93,104 +129,201 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
     };
   }
 
-  private handleIncomingCall(channel: any) {
-    if (this.callReceivedCallback) {
-      const callId = channel.variables?.CALL_ID || channel.id;
-      const call = new Call(
+  private async handleIncomingCall(orgId: string | null, channel: any) {
+    const role = channel.variables?.ROLE || 'customer';
+    const callId = channel.variables?.CALL_ID || channel.id;
+    const bridgeId = channel.variables?.BRIDGE_ID;
+
+    await this.eventBus.publish({
+      type: 'telephony.channel_entered',
+      organizationId: orgId || 'system',
+      payload: {
+        channelId: channel.id,
         callId,
-        channel.caller.number || 'Unknown',
-        channel.dialplan.exten || 'Unknown'
-      );
+        role,
+        bridgeId,
+        callerNumber: channel.caller?.number,
+        destination: channel.variables?.DESTINATION
+      },
+      timestamp: new Date()
+    });
+
+    if (!channel.variables?.CALL_ID && role === 'customer') {
+      const call = new Call(callId, channel.caller.number || 'Unknown', channel.dialplan.exten || 'Unknown');
+      (call as any).organizationId = orgId;
       call.externalId = channel.id;
       call.state = CallState.RINGING;
-      this.callReceivedCallback(call);
+
+      await this.eventBus.publish({
+        type: 'telephony.call_received',
+        organizationId: orgId || 'system',
+        payload: call,
+        timestamp: new Date()
+      });
     }
-    this.startRecording(channel.id);
   }
 
-  private async startRecording(channelId: string) {
-    if (this.client) {
+  private async handleCallHangup(orgId: string | null, channel: any) {
+    const callId = channel.variables?.CALL_ID;
+    const bridgeId = channel.variables?.BRIDGE_ID;
+
+    if (bridgeId) {
+      await this.stopBridgeRecording(orgId, bridgeId, callId);
+    }
+
+    await this.eventBus.publish({
+      type: 'telephony.channel_hungup',
+      organizationId: orgId || 'system',
+      payload: { channelId: channel.id, callId, bridgeId },
+      timestamp: new Date()
+    });
+
+    await this.eventBus.publish({
+      type: 'telephony.call_ended',
+      organizationId: orgId || 'system',
+      payload: { callId: channel.id },
+      timestamp: new Date()
+    });
+  }
+
+  async startBridgeRecording(orgId: string | null, bridgeId: string, callId: string): Promise<void> {
+    try {
+      const client = await this.getClient(orgId);
+      const recording = await client.bridges.record({
+        bridgeId,
+        name: `call-${callId}-${Date.now()}`,
+        format: 'wav',
+        ifExists: 'overwrite'
+      });
+      this.recordings.set(bridgeId, recording);
+    } catch (e) {
+      this.logger.error(`Failed to start bridge recording: ${e.message}`);
+    }
+  }
+
+  async stopBridgeRecording(orgId: string | null, bridgeId: string, callId: string): Promise<void> {
+    const recording = this.recordings.get(bridgeId);
+    if (recording) {
       try {
-        const recording = await this.client.channels.record({
-          channelId,
-          name: `recording-${channelId}`,
-          format: 'wav',
-          ifExists: 'overwrite'
-        });
-        this.recordings.set(channelId, recording);
-      } catch (error) {
-        this.logger.error('Failed to start recording:', error);
-      }
-    }
-  }
-
-  private handleCallHangup(channel: any) {
-    this.stopRecording(channel.id);
-    if (this.callEndedCallback) {
-      this.callEndedCallback(channel.id);
-    }
-  }
-
-  private async stopRecording(channelId: string) {
-    const recording = this.recordings.get(channelId);
-    const orgId = this.channelOrgMap.get(channelId) || null;
-    if (recording && this.client) {
-      try {
-        await this.client.recordings.stop({ recordingName: recording.name });
-        const stream = await this.client.recordings.getStoredFile({ recordingName: recording.name });
-        await this.storageService.uploadRecording(channelId, stream, 'audio/wav', orgId);
-        await this.client.recordings.deleteStored({ recordingName: recording.name });
-        this.recordings.delete(channelId);
-        this.channelOrgMap.delete(channelId);
-      } catch (error) {
-        this.logger.error(`Failed to stop/upload recording: ${error.message}`);
+        const client = await this.getClient(orgId);
+        await client.recordings.stop({ recordingName: recording.name });
+        const stream = await client.recordings.getStoredFile({ recordingName: recording.name });
+        await this.storageService.uploadRecording(callId || bridgeId, stream, 'audio/wav', orgId);
+        await client.recordings.deleteStored({ recordingName: recording.name });
+        this.recordings.delete(bridgeId);
+      } catch (e) {
+        this.logger.error(`Failed to stop/upload bridge recording: ${e.message}`);
       }
     }
   }
 
   async createCall(call: Call): Promise<string | void> {
     const orgId = (call as any).organizationId || null;
-    if (!this.client) throw new TelephonyProviderError('Asterisk client not connected', 'asterisk');
+    const client = await this.getClient(orgId);
+    
     try {
       const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config', true);
-      if (!config) throw new ConfigurationMissingError('telephony.asterisk.config', orgId);
+      const bridgeId = `bridge-${call.id}`;
+      await client.bridges.create({ type: 'mixing', bridgeId });
 
-      const channel = await this.client.channels.originate({
-        endpoint: config.endpoint || 'PJSIP/twilio-trunk',
-        extension: call.to,
-        context: config.context || 'outbound',
-        callerId: call.from,
-        variables: { CALL_ID: call.id }
+      const agentEndpoint = `PJSIP/${call.agentId || 'unknown'}`;
+      const channel = await client.channels.originate({
+        endpoint: agentEndpoint,
+        app: config?.app || 'psynq-app',
+        variables: { 
+          CALL_ID: call.id, 
+          BRIDGE_ID: bridgeId, 
+          ROLE: 'agent',
+          DESTINATION: call.to
+        }
       });
-      this.channelOrgMap.set(channel.id, orgId);
+
       return channel.id;
     } catch (error) {
       if (error instanceof PsynqException) throw error;
-      throw new TelephonyProviderError(`Failed to originate call: ${error.message}`, 'asterisk', error);
+      throw new TelephonyProviderError(`Failed to initiate calling machine: ${error.message}`, 'asterisk', error);
+    }
+  }
+
+  async dialLegB(orgId: string | null, callId: string, bridgeId: string, destination: string): Promise<void> {
+    const client = await this.getClient(orgId);
+    const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+    await client.channels.originate({
+      endpoint: config?.endpoint || 'PJSIP/main-trunk',
+      extension: destination,
+      app: config?.app || 'psynq-app',
+      variables: { CALL_ID: callId, BRIDGE_ID: bridgeId, ROLE: 'customer' }
+    });
+  }
+
+  async joinBridge(orgId: string | null, bridgeId: string, channelId: string): Promise<void> {
+    const client = await this.getClient(orgId);
+    const bridge = await client.bridges.get({ bridgeId });
+    await bridge.addChannel({ channel: channelId });
+  }
+
+  async playAudio(orgId: string | null, callId: string, url: string): Promise<void> {
+    const client = await this.getClient(orgId);
+    try {
+      await client.channels.play({ channelId: callId, media: `sound:${url}` });
+    } catch (e) {
+      this.logger.error(`Failed to play audio on ${callId}: ${e.message}`);
+    }
+  }
+
+  async sayText(orgId: string | null, callId: string, text: string): Promise<void> {
+    const client = await this.getClient(orgId);
+    try {
+      // Assuming a TTS engine like Flite or Google is configured in Asterisk
+      await client.channels.play({ channelId: callId, media: `tts:${text}` });
+    } catch (e) {
+      this.logger.error(`Failed to say text on ${callId}: ${e.message}`);
+    }
+  }
+
+  async gatherDigits(orgId: string | null, callId: string, options: { maxDigits: number, timeout: number, finishOnKey: string }): Promise<void> {
+    // In ARI, digits are received as events. We just need to ensure the channel is in Stasis.
+    this.logger.debug(`Listening for digits on channel ${callId}. Max: ${options.maxDigits}`);
+  }
+
+  async forkAudio(orgId: string | null, callId: string, destination: string): Promise<void> {
+    const client = await this.getClient(orgId);
+    try {
+      // Create a snoop channel that forks the audio to an external RTP destination
+      // destination should be in format 'host:port'
+      await client.channels.snoopChannel({
+        channelId: callId,
+        spy: 'both',
+        app: 'psynq-app',
+        appArgs: `fork:${destination}`
+      });
+      this.logger.log(`Forked audio for channel ${callId} to ${destination}`);
+    } catch (e) {
+      this.logger.error(`Failed to fork audio for ${callId}: ${e.message}`);
     }
   }
 
   async bridgeParticipants(call: Call, targetIdentifier: string, options?: BridgeOptions): Promise<CallParticipant | void> {
     const orgId = (call as any).organizationId || null;
     const callId = call.externalId || call.id;
-    if (!this.client) throw new TelephonyProviderError('Asterisk client not connected', 'asterisk');
+    const client = await this.getClient(orgId);
+    
     try {
       const bridgeId = `bridge-${call.id}`;
       let bridge;
-      try { bridge = await this.client.bridges.get({ bridgeId }); } 
-      catch (e) { bridge = await this.client.bridges.create({ type: 'mixing', bridgeId, name: bridgeId }); }
+      try { bridge = await client.bridges.get({ bridgeId }); } 
+      catch (e) { bridge = await client.bridges.create({ type: 'mixing', bridgeId, name: bridgeId }); }
 
       await bridge.addChannel({ channel: callId });
 
       const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
-      const targetChannel = await this.client.channels.originate({
+      const targetChannel = await client.channels.originate({
           endpoint: `PJSIP/${targetIdentifier}`,
           app: config?.app || 'psynq-app',
           variables: { CALL_ID: call.id, BRIDGE_ID: bridgeId }
       });
       
       await bridge.addChannel({ channel: targetChannel.id });
-      this.channelOrgMap.set(targetChannel.id, orgId);
 
       const channelSid = targetChannel.id;
       const standardParticipantId = createStandardParticipantId('asterisk', call.id, channelSid);
@@ -215,16 +348,16 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
   async injectSupervisor(call: Call, supervisorId: string, options?: SupervisorControlOptions): Promise<CallParticipant | void> {
     const callId = call.externalId || call.id;
     const orgId = (call as any).organizationId || null;
-    
-    if (!this.client) throw new TelephonyProviderError('Asterisk client not connected', 'asterisk');
+    const client = await this.getClient(orgId);
+
     try {
         if (options?.mode === 'whisper') {
             const bridgeId = `bridge-${call.id}`;
-            const bridge = await this.client.bridges.get({ bridgeId });
+            const bridge = await client.bridges.get({ bridgeId });
             const agentChannelId = bridge.channels.find(id => id !== callId);
             
             if (agentChannelId) {
-                const snoopChannel = await this.client.channels.snoopChannel({
+                const snoopChannel = await client.channels.snoopChannel({
                     channelId: agentChannelId,
                     app: 'psynq-app',
                     spy: 'both',
@@ -233,12 +366,12 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
                 });
                 
                 const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
-                const supervisorChannel = await this.client.channels.originate({
+                const supervisorChannel = await client.channels.originate({
                     endpoint: `PJSIP/${supervisorId}`,
                     app: config?.app || 'psynq-app',
                 });
                 
-                const snoopBridge = await this.client.bridges.create({ type: 'mixing', name: `snoop-${call.id}` });
+                const snoopBridge = await client.bridges.create({ type: 'mixing', name: `snoop-${call.id}` });
                 await snoopBridge.addChannel({ channel: [supervisorChannel.id, snoopChannel.id] });
                 
                 const standardParticipantId = createStandardParticipantId('asterisk', call.id, supervisorChannel.id);
@@ -273,37 +406,37 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit {
   }
 
   async setParticipantMuted(orgId: string | null, participantId: string, muted: boolean): Promise<void> {
-    if (!this.client) return;
+    const client = await this.getClient(orgId);
     try {
-      const channelId = participantId.startsWith('chan_') ? participantId.substring(5) : participantId;
-      if (muted) await this.client.channels.startMoh({ channelId, musicClass: 'silence' });
-      else await this.client.channels.stopMoh({ channelId });
+      const channelId = participantId.includes(':') ? participantId.split(':')[1] : participantId;
+      if (muted) await client.channels.startMoh({ channelId, musicClass: 'silence' });
+      else await client.channels.stopMoh({ channelId });
     } catch (error) {
       throw new TelephonyProviderError(`Failed to set participant mute state: ${error.message}`, 'asterisk', error);
     }
   }
 
   async setParticipantOnHold(orgId: string | null, participantId: string, onHold: boolean): Promise<void> {
-    if (!this.client) return;
+    const client = await this.getClient(orgId);
     try {
-      const channelId = participantId.startsWith('chan_') ? participantId.substring(5) : participantId;
-      if (onHold) await this.client.channels.startMoh({ channelId });
-      else await this.client.channels.stopMoh({ channelId });
+      const channelId = participantId.includes(':') ? participantId.split(':')[1] : participantId;
+      if (onHold) await client.channels.startMoh({ channelId });
+      else await client.channels.stopMoh({ channelId });
     } catch (error) {
       throw new TelephonyProviderError(`Failed to set participant hold state: ${error.message}`, 'asterisk', error);
     }
   }
 
   async endCall(call: Call): Promise<void> {
+    const orgId = (call as any).organizationId || null;
     const callId = call.externalId || call.id;
-    if (this.client) {
-      try {
-        const snoopBridgeId = `snoop-${call.id}`;
-        try { await this.client.bridges.destroy({ bridgeId: snoopBridgeId }); } catch (e) {}
-        await this.client.channels.hangup({ channelId: callId });
-      } catch (error) {
-        this.logger.error(`Failed to hangup call: ${error.message}`);
-      }
+    const client = await this.getClient(orgId);
+    try {
+      const snoopBridgeId = `snoop-${call.id}`;
+      try { await client.bridges.destroy({ bridgeId: snoopBridgeId }); } catch (e) {}
+      await client.channels.hangup({ channelId: callId });
+    } catch (error) {
+      this.logger.error(`Failed to hangup call: ${error.message}`);
     }
   }
 

@@ -5,71 +5,98 @@ import { SettingEntity } from '../entities/setting.entity';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { CryptoUtil } from '../utils/crypto.util';
+import { validateOrReject, IsEnum, IsString, IsOptional, IsUrl } from 'class-validator';
+import { plainToInstance, Expose } from 'class-transformer';
 
-export interface SettingValidation {
-  validate: (value: any) => boolean;
-  message: string;
+export class AsteriskConfigDto {
+  @IsUrl()
+  @IsOptional()
+  url?: string;
+
+  @IsString()
+  @IsOptional()
+  username?: string;
+
+  @IsString()
+  @IsOptional()
+  password?: string;
+
+  @IsString()
+  @IsOptional()
+  app?: string;
+
+  @IsString()
+  @IsOptional()
+  endpoint?: string;
+
+  @IsString()
+  @IsOptional()
+  context?: string;
+}
+
+export class TelephonySettingsDto {
+  @IsEnum(['twilio', 'asterisk'])
+  provider: string;
+
+  @IsOptional()
+  @Expose()
+  asteriskConfig?: AsteriskConfigDto;
 }
 
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
-  private readonly validationRegistry: Map<string, SettingValidation> = new Map();
 
   constructor(
     @InjectRepository(SettingEntity)
     private readonly settingsRepository: Repository<SettingEntity>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {
-    this.registerDefaults();
-  }
+  ) {}
 
-  private registerDefaults() {
-    this.validationRegistry.set('telephony.provider', {
-      validate: (v) => ['twilio', 'asterisk'].includes(v),
-      message: 'Provider must be twilio or asterisk',
-    });
-    this.validationRegistry.set('storage.provider', {
-      validate: (v) => ['local', 's3', 'minio'].includes(v),
-      message: 'Storage must be local, s3, or minio',
-    });
-  }
-
-  async getSetting(orgId: string | null, key: string, includeSecrets = false): Promise<any> {
+  async getSetting<T>(orgId: string | null, key: string, includeSecrets = false, cls?: new () => T): Promise<T | any> {
     const cacheKey = `settings:${orgId || 'system'}:${key}`;
     const cached = await this.cacheManager.get(cacheKey);
+    
+    let result: any;
     if (cached !== undefined && cached !== null) {
-      return this.processSettingValue(cached, includeSecrets);
+      result = this.processSettingValue(cached, includeSecrets);
+    } else {
+      // 1. Try Org-specific
+      let setting = orgId 
+        ? await this.settingsRepository.findOne({ where: { organizationId: orgId, key } })
+        : null;
+
+      // 2. Try System-default
+      if (!setting) {
+        setting = await this.settingsRepository.findOne({ where: { organizationId: IsNull(), key } });
+      }
+
+      if (!setting) return null;
+
+      // Decrypt if secret
+      let value = setting.value;
+      if (setting.isSecret) {
+        value = CryptoUtil.decrypt(value);
+      }
+
+      // Cache the plain value (internally)
+      await this.cacheManager.set(cacheKey, { value, isSecret: setting.isSecret }, 3600);
+      result = this.processSettingValue({ value, isSecret: setting.isSecret }, includeSecrets);
     }
 
-    // 1. Try Org-specific
-    let setting = orgId 
-      ? await this.settingsRepository.findOne({ where: { organizationId: orgId, key } })
-      : null;
-
-    // 2. Try System-default
-    if (!setting) {
-      setting = await this.settingsRepository.findOne({ where: { organizationId: IsNull(), key } });
+    if (cls && result && typeof result === 'object') {
+      return plainToInstance(cls, result);
     }
-
-    if (!setting) return null;
-
-    // Decrypt if secret
-    let value = setting.value;
-    if (setting.isSecret) {
-      value = CryptoUtil.decrypt(value);
-    }
-
-    // Cache the plain value (internally)
-    await this.cacheManager.set(cacheKey, { value, isSecret: setting.isSecret }, 3600);
-
-    return this.processSettingValue({ value, isSecret: setting.isSecret }, includeSecrets);
+    return result;
   }
 
   async setSetting(orgId: string | null, key: string, value: any, isSecret = false): Promise<void> {
-    const validation = this.validationRegistry.get(key);
-    if (validation && !validation.validate(value)) {
-      throw new BadRequestException(validation.message);
+    // Standard industry validation using classes
+    if (key === 'telephony.asterisk.config') {
+      const dto = plainToInstance(AsteriskConfigDto, value);
+      await validateOrReject(dto).catch(errors => {
+        throw new BadRequestException(errors.toString());
+      });
     }
 
     let storedValue = value;

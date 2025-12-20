@@ -36,9 +36,15 @@ export class UserEntity {
   @Column({
     type: 'enum',
     enum: AgentStatus,
-    default: AgentStatus.AWAY,
+    default: AgentStatus.OFFLINE,
   })
   status: AgentStatus;
+
+  @Column({ type: 'simple-array', nullable: true })
+  skills: string[];
+
+  @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  lastStatusChangedAt: Date;
 
   @CreateDateColumn()
   createdAt: Date;

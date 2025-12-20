@@ -1,3 +1,5 @@
+import { Expose, Type } from 'class-transformer';
+
 export enum CallDirection {
 	INBOUND = 'inbound',
 	OUTBOUND = 'outbound',
@@ -12,20 +14,46 @@ export enum CallState {
 }
 
 export class Call {
+	@Expose()
 	id: string;
+
+	@Expose()
+	organizationId?: string;
+
+	@Expose()
 	state: CallState;
+
+	@Expose()
 	direction: CallDirection;
+
+	@Expose()
 	from: string;
+
+	@Expose()
 	to: string;
+
+	@Expose()
 	agentId?: string;
-	// External provider call ID (e.g., Twilio SID)
+
+	@Expose()
 	externalId?: string;
-	// Provider specific metadata (e.g. supervisor participant SID)
+
+	@Expose()
 	providerMetadata?: Record<string, any>;
-	// Parent call SID for child legs (Twilio)
-	parentCallSid?: string;
+
+	@Expose()
+	externalParentId?: string;
+
+	@Expose()
+	@Type(() => Date)
 	startedAt?: Date;
+
+	@Expose()
+	@Type(() => Date)
 	answeredAt?: Date;
+
+	@Expose()
+	@Type(() => Date)
 	endedAt?: Date;
 
 	constructor(id: string, from: string, to: string, direction: CallDirection = CallDirection.INBOUND) {

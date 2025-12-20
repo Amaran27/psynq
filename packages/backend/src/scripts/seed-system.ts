@@ -53,7 +53,7 @@ async function bootstrap() {
     // Seed Default System Settings
     const settingsService = app.get(SettingsService);
     const defaultSettings = [
-        { key: 'telephony.provider', value: 'twilio', isSecret: false },
+        { key: 'telephony.provider', value: 'asterisk', isSecret: false },
         { key: 'storage.provider', value: 'local', isSecret: false },
     ];
 

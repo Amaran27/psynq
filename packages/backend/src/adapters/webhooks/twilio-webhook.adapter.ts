@@ -42,9 +42,10 @@ export class TwilioWebhookAdapter implements WebhookAdapter {
     return {
       provider: 'twilio',
       eventType,
-      callId: callSid, // For Twilio, use the Call SID as the callId
+      organizationId: 'system', // TODO: Lookup org based on phone number
+      callId: callSid,
       externalId: callSid,
-      parentCallSid: payload.ParentCallSid,
+      externalParentId: payload.ParentCallSid,
       data: {
         ...payload,
         isInbound

@@ -37,13 +37,4 @@ export class AppConfigService {
       database: process.env.DB_DATABASE || 'psynq_db',
     };
   }
-
-  get twilioConfig() {
-    return {
-      accountSid: process.env.TWILIO_ACCOUNT_SID || '',
-      apiKey: process.env.TWILIO_API_KEY || '',
-      apiSecret: process.env.TWILIO_API_SECRET || '',
-      twimlAppSid: process.env.TWILIO_TWIML_APP_SID || '',
-    };
-  }
 }

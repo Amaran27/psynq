@@ -2,12 +2,13 @@
  * Standardized webhook event format that all provider adapters should emit
  */
 export interface StandardWebhookEvent {
-  provider: 'twilio' | 'asterisk' | 'infobip';
-  eventType: 'call_started' | 'call_ended' | 'call_answered' | 'call_ringing' | 'participant_added' | 'participant_removed' | 'participant_updated';
+  provider: 'twilio' | 'asterisk';
+  eventType: 'call_started' | 'call_ringing' | 'call_answered' | 'call_ended';
+  organizationId: string;
   callId: string;
-  externalId?: string; // Provider's external call ID
-  parentCallSid?: string; // Parent call SID for child legs
-  data: Record<string, any>; // Provider-specific event data
+  externalId: string;
+  externalParentId?: string;
+  data: Record<string, any>;
   timestamp: Date;
 }
 
