@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, NotFoundException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, NotFoundException, UseGuards, Req } from '@nestjs/common';
 import { CallService } from './services/call.service';
 import { CreateCallDto, CallResponseDto, CallActionDto } from './dtos/call.dto';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -13,8 +13,9 @@ export class CallController {
    * Create a new outbound call
    */
   @Post()
-  async createCall(@Body() createCallDto: CreateCallDto): Promise<CallResponseDto> {
-    return await this.callService.createCall(createCallDto);
+  async createCall(@Body() createCallDto: CreateCallDto, @Req() req): Promise<CallResponseDto> {
+    const agentId = req.user?.id || createCallDto.agentId;
+    return await this.callService.createCall(createCallDto, agentId);
   }
 
   /**

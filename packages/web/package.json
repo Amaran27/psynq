@@ -9,8 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@psynq/core": "^1.0.0",
-    "@twilio/voice-sdk": "^2.17.0",
+    "@psynq/core": "file:../core",
     "jwt-decode": "^4.0.0",
     "next": "16.0.10",
     "react": "19.2.1",

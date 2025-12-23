@@ -1,0 +1,9 @@
+[psynq]
+enabled => yes
+dsn => psynq-postgres
+pre-connect => yes
+max_connections => 5
+username => ${DB_USER}
+password => ${DB_PASSWORD}
+limit_backend => yes
+dont_share_connections => yes

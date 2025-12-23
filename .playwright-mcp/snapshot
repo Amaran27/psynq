@@ -1,0 +1,43 @@
+### New console messages
+- [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/auth/status:0
+- [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/telephony/token...
+- [ERROR] Failed to initialize telephony: TypeError: Failed to fetch
+    at HttpCallApiAdapter.getTele...
+- [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/telephony/token...
+- [ERROR] Failed to initialize telephony: TypeError: Failed to fetch
+    at HttpCallApiAdapter.getTele...
+- [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): ...
+- [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://localhost:3001/calls:0
+- [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_7a8122d0._....
+- [ERROR] WebSocket connection to 'ws://localhost:3001/socket.io/?EIO=4&transport=websocket' failed: E...
+
+### Page state
+- Page URL: http://localhost:3000/
+- Page Title: Psynq Call Center
+- Page Snapshot:
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e65] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e66]:
+      - img [ref=e67]
+    - generic [ref=e70]:
+      - button "Open issues overlay" [ref=e71]:
+        - generic [ref=e72]:
+          - generic [ref=e73]: "0"
+          - generic [ref=e74]: "1"
+        - generic [ref=e75]: Issue
+      - button "Collapse issues badge" [ref=e76]:
+        - img [ref=e77]
+  - alert [ref=e60]
+  - generic [ref=e80]:
+    - heading "Login to Psynq" [level=3] [ref=e81]
+    - generic [ref=e83]:
+      - generic [ref=e84]:
+        - generic [ref=e85]: Username
+        - textbox "Username" [ref=e86]: sysadmin
+      - generic [ref=e87]:
+        - generic [ref=e88]: Password
+        - textbox "Password" [ref=e89]: PsynqSecure2025!!
+      - paragraph [ref=e90]: Not authenticated or API adapter not initialized
+      - button "Login" [ref=e92]
+```

@@ -27,6 +27,7 @@ import { AuthModule } from '../auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
 import { StorageModule } from '../modules/storage/storage.module';
 import { EventBusModule } from '../modules/event-bus/event-bus.module';
+import { ConfigModule as AppConfigModule } from '../config/config.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { EventBusModule } from '../modules/event-bus/event-bus.module';
       UserEntity,
     ]),
     ConfigModule,
+    AppConfigModule,
     forwardRef(() => AuthModule),
     JwtModule,
     StorageModule,

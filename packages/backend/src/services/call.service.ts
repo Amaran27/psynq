@@ -106,23 +106,24 @@ export class CallService implements OnModuleInit {
     }
   }
 
-  async createCall(createCallDto: CreateCallDto): Promise<CallResponseDto> {
+  async createCall(createCallDto: CreateCallDto, agentId?: string): Promise<CallResponseDto> {
     const orgId = createCallDto.organizationId || '';
 
     if (orgId) {
       await this.billingService.checkBalance(orgId, createCallDto.to);
     }
 
-    if (createCallDto.agentId) {
-      const isAvailable = await this.agentStateService.isAvailable(createCallDto.agentId);
+    if (createCallDto.agentId || agentId) {
+      const id = createCallDto.agentId || agentId;
+      const isAvailable = await this.agentStateService.isAvailable(id!);
       if (!isAvailable) {
-        throw new BadRequestException(`Agent ${createCallDto.agentId} is not available for a call.`);
+        throw new BadRequestException(`Agent ${id} is not available for a call.`);
       }
     }
 
     const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const call = new Call(callId, createCallDto.from, createCallDto.to, CallDirection.OUTBOUND);
-    if (createCallDto.agentId) call.agentId = createCallDto.agentId;
+    if (createCallDto.agentId || agentId) call.agentId = createCallDto.agentId || agentId;
     if (createCallDto.organizationId) (call as any).organizationId = createCallDto.organizationId;
 
     try {

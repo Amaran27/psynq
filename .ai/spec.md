@@ -22,30 +22,49 @@
 
 ## 3. Core Architecture
 
+### Open-Source Production Stack
+- **Telephony Engine**: Asterisk ARI (Media handling & Call Control).
+- **SIP Proxy / SBC**: Kamailio (Security, Load Balancing, NAT traversal).
+- **Provisioning**: Asterisk Realtime Architecture (ARA). Configuration is pulled dynamically from PostgreSQL via ODBC.
+- **Media Proxy**: RTPEngine (Handles WebRTC <-> PSTN media bridging).
+
 ### Event-Driven Orchestration (Abstract Event Bus)
 - **`EventBusPort`**: Decouples `CallService` from `CallGateway`.
 - **Plug-and-Play**: Supports `LocalEventBusAdapter` (Single Container) and `RedisEventBusAdapter` (Cloud/Distributed).
-- **Events**: `call.new`, `call.updated`, `participant.joined`.
+- **Events**: `call.new`, `call.updated`, `telephony.channel_entered`, `intelligence.coaching_tip`.
 
-### Multi-Tenant Telephony (`AsteriskAdapter`)
-- **Dynamic Connection Pooling**: ARI clients are initialized on-demand per `organizationId`.
-- **SIP Trunking**: Outbound calls route through `PJSIP` endpoints defined in tenant settings.
-- **Unified Supervisor**: Uses ARI `snoopChannel` for barge/whisper mode.
+### Provisioning & Scaling (No-Reload Strategy)
+- **Zero-Downtime Updates**: Move away from static `.conf` files. 
+- **DB-Driven Endpoints**: All PJSIP endpoints (Agents), AORs, and Auth objects are stored in PostgreSQL.
+- **Dynamic Identity**: SIP identities are mapped directly to User Entity usernames via the `TelephonyPort` interface.
+- **UI Configurability**: The web dashboard interacts with the Backend API, which writes to the Database. Asterisk reflects these changes instantly without a service reload.
+
+### Security & Hardening
+- **SBC Layer**: Kamailio acts as the entry point, protecting Asterisk from DoS and brute-force attacks (Planned).
+- **WSS & SRTP**: Mandatory encryption for all signaling and media.
+- **Environment-Based Secrets**: Database and ARI credentials are never stored in config files; they are injected at runtime via Docker Environment Variables and processed by a custom `entrypoint.sh` templating engine.
+- **JWT-Based Auth**: Future migration from static SIP passwords to short-lived tokens for WebRTC clients.
+
+### Real-Time Billing Engine
+- **Prefix Rating**: Matches dialed numbers against a hierarchical prefix table (LCR style).
+- **Credit Enforcement**: Checks multi-tenant wallet balances before call origination.
+- **Per-Second Billing**: Automatically calculates and deducts costs upon `call_ended` events.
 
 ### Data Integrity & State
 - **`CallStateMachine`**: Strict transition enforcement in `@psynq/core`.
-- **State Rollback**: `CallService` rolls back DB state if telephony commands (bridging/origination) fail.
-- **Agnostic Schema**: Renamed provider-specific columns (e.g., `parentCallSid` -> `externalParentId`).
+- **Presence Management**: Standardized agent states (`available`, `busy`, `break`, `wrap_up`, `offline`) with automated transitions during call lifecycles.
+- **State Rollback**: `CallService` rolls back DB state if telephony commands fail.
 
 ## 4. Tech Stack
 
 | Layer | Technology | Key Libraries |
 | :--- | :--- | :--- |
-| **Backend** | NestJS (v11) | `typeorm`, `@nestjs/event-emitter`, `class-transformer` |
-| **Frontend** | Next.js (React 19) | `zustand`, `sip.js`, `socket.io-client` |
+| **Backend** | NestJS (v11) | `typeorm`, `socket.io`, `class-transformer`, `langchain` |
+| **Frontend** | Next.js (React 19) | `zustand`, `sip.js`, `socket.io-client`, `reflect-metadata` |
 | **Telephony** | Asterisk (ARI) | `ari-client` |
+| **Transcription** | Deepgram | `@deepgram/sdk` |
 | **Database** | PostgreSQL | `pg` |
-| **Security** | AES-256 | `crypto-js` |
+| **Security** | AES-256 | `crypto-js`, `bcrypt`, `jwt` |
 
 ## 5. Non-Negotiable Development Rules
 
@@ -55,6 +74,7 @@
 4.  **Event-First**: Side effects (notifications, UI updates) must be triggered via `EventBus.publish`.
 5.  **Tenant Bound**: Every database query and external command must include an `organizationId`.
 6.  **Secret Management**: Sensitive keys in `SettingsService` must be saved with `isSecret: true`.
+7.  **Decorator Resilience**: Always import `reflect-metadata` in frontend entry points to support `@psynq/core` models.
 
 ## 6. Strategic Gap Analysis (The Path to "Giant" Status)
 
@@ -63,9 +83,7 @@ To match Exotel/Ozonetel, we must transition from direct-ARI to a **SIP Proxy Ti
 - **Action**: Introduce **Kamailio** as the signaling entry point. Asterisk should only handle media mixing.
 
 ### Billing (Revenue)
-CPaaS requires per-second accuracy.
-- **Action**: Implement a **Rating Engine** that reads destination prefixes and subtracts credit from a Redis-backed wallet in real-time.
+✅ **Implemented**: Per-second rating engine with prefix matching and pre-call balance enforcement.
 
 ### Intelligence (Value-Add)
-Post-call analysis is not enough.
-- **Action**: Use **Vosk/Deepgram** via RTP streaming to provide live sentiment alerts to Supervisors.
+✅ **Implemented**: Real-time STT (Deepgram) + LLM (LangChain) coaching tips via RTP forking.

@@ -1,0 +1,25 @@
+[psynq-postgres]
+Description         = PostgreSQL connection for Psynq
+Driver              = PostgreSQL Unicode
+Database            = ${DB_DATABASE}
+Servername          = ${DB_HOST}
+Port                = ${DB_PORT}
+UserName            = ${DB_USER}
+Password            = ${DB_PASSWORD}
+ReadOnly            = No
+ConnSettings        = SET client_encoding TO 'UTF8';
+Btrim               = 1
+MaxVarcharSize      = 0
+MaxLongVarcharSize  = 0
+TextAsLongVarchar   = Yes
+FakeIndex           = Yes
+ShowSystemTables    = No
+RowVersioning       = No
+ShowOID             = No
+FakeLOBField        = No
+Debug               = 0
+CommLog             = 0
+Fetch               = 100
+UpdatableCursors    = Yes
+ByteaAsLongVarBinary= Yes
+BoolAsChar          = No

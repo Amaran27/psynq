@@ -2,7 +2,7 @@
  * Standardized webhook event format that all provider adapters should emit
  */
 export interface StandardWebhookEvent {
-  provider: 'twilio' | 'asterisk';
+  provider: 'asterisk';
   eventType: 'call_started' | 'call_ringing' | 'call_answered' | 'call_ended';
   organizationId: string;
   callId: string;
@@ -22,7 +22,7 @@ export interface WebhookAdapter {
   processWebhook(payload: any): Promise<StandardWebhookEvent | null>;
   
   /**
-   * Generates the appropriate response for the webhook (e.g., TwiML for Twilio)
+   * Generates the appropriate response for the webhook
    */
   generateResponse(event: StandardWebhookEvent): Promise<string | null>;
 }

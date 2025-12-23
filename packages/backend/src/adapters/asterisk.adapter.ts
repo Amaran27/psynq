@@ -11,6 +11,7 @@ import { SettingsService } from '../services/settings.service';
 import { Readable } from 'stream';
 import { PsynqException, TelephonyProviderError, ConfigurationMissingError } from '../common/exceptions/psynq.exception';
 import { EventBusPort } from '../ports/event-bus.port';
+import { AppConfigService } from '../config/app.config.service';
 
 @Injectable()
 export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDestroy {
@@ -25,6 +26,7 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
     private readonly storageService: StorageService,
     private readonly settingsService: SettingsService,
     @Inject('EVENT_BUS') private readonly eventBus: EventBusPort,
+    private readonly appConfigService: AppConfigService,
   ) {}
 
   async onModuleInit() {
@@ -49,9 +51,9 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
         throw new ConfigurationMissingError('telephony.asterisk.config', orgId);
       }
 
-      const ariUrl = config.url || 'http://127.0.0.1:8088';
-      const ariUser = config.username || 'psynq';
-      const ariPass = config.password || 'asterisk';
+      const ariUrl = config.url || this.appConfigService.asteriskConfig.url;
+      const ariUser = config.username || this.appConfigService.asteriskConfig.username;
+      const ariPass = config.password || this.appConfigService.asteriskConfig.password;
       
       const client = await ari.connect(ariUrl, ariUser, ariPass);
       
@@ -85,7 +87,7 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
           }
       });
 
-      client.start(config.app || 'psynq-app');
+      client.start(config.app || this.appConfigService.asteriskConfig.app);
       this.clients.set(key, client);
       this.logger.log(`Connected to Asterisk ARI for org: ${key}`);
       return client;
@@ -95,16 +97,72 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
     }
   }
 
-  async generateToken(orgId: string | null, agentId: string): Promise<any> {
+  async generateToken(orgId: string | null, agentId: string, username?: string): Promise<any> {
     const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config', true);
-    
-    return {
+    // Use passed username or fall back to agentId (which is usually a UUID)
+    const sipUsername = username || agentId;
+
+    // Generate a random password for the SIP credential
+    const crypto = await import('crypto');
+    const sipPassword = crypto.randomBytes(12).toString('hex');
+
+    // Attempt to provision the credential and endpoint in Asterisk realtime DB so the
+    // browser can register via WebSocket (SIP over WS). Use AppDataSource to upsert rows.
+    try {
+      const AppDataSource = (await import('../data-source')).default;
+      await AppDataSource.initialize();
+      const qr = AppDataSource.createQueryRunner();
+      await qr.connect();
+
+      // Upsert auth (ps_auths_data)
+      await qr.query(
+        `INSERT INTO ps_auths_data (id, auth_type, username, password)
+         VALUES ($1, 'userpass', $2, $3)
+         ON CONFLICT (id) DO UPDATE SET username = $2, password = $3`,
+        [sipUsername, sipUsername, sipPassword]
+      );
+
+      // Upsert AOR (ps_aors_data) - minimal contact placeholder
+      await qr.query(
+        `INSERT INTO ps_aors_data (id, contact, qualify_frequency)
+         VALUES ($1, $2, 30)
+         ON CONFLICT (id) DO UPDATE SET contact = $2`,
+        [sipUsername, `sip:${sipUsername}@127.0.0.1`]
+      );
+
+      // Upsert endpoint (ps_endpoints_data)
+      await qr.query(
+        `INSERT INTO ps_endpoints_data (
+            id, transport, aors, context, disallow, allow, rewrite_contact, force_rport, rtp_symmetric
+         ) VALUES (
+            $1, $2, $3, $4, 'all', 'ulaw', 'yes', 'yes', 'yes'
+         )
+         ON CONFLICT (id) DO UPDATE SET aors = $3`,
+        [sipUsername, this.appConfigService.asteriskConfig.transport, sipUsername, this.appConfigService.asteriskConfig.context]
+      );
+
+      await qr.release();
+      await AppDataSource.destroy();
+    } catch (err) {
+      this.logger.warn(`Failed to provision SIP credential for ${sipUsername}: ${err?.message || err}`);
+      // proceed - return token anyway (UI will get auth failure and we can debug further)
+    }
+
+    const token = {
       provider: 'asterisk',
-      server: config?.webrtc_uri || process.env.ASTERISK_WEBRTC_URI || `wss://asterisk.psynq.com:8089/ws`,
-      user: agentId,
-      sip_uri: `sip:${agentId}@${config?.domain || 'asterisk.psynq.com'}`,
-      password: config?.password || 'agent-password',
+      server: this.appConfigService.asteriskWebRtcUri,
+      user: sipUsername,
+      sip_uri: `sip:${sipUsername}@${config?.domain || this.appConfigService.asteriskConfig.domain}`,
+      password: sipPassword,
     };
+
+    // In development, force the server to point to local Asterisk WS to avoid mismatched WSS defaults
+    if (this.appConfigService.nodeEnv !== 'production') {
+      token.server = process.env.ASTERISK_WEBRTC_URI || 'ws://127.0.0.1:8088/ws';
+    }
+
+    this.logger.log(`Generated telephony token for ${sipUsername}: ${JSON.stringify({ server: token.server, sip_uri: token.sip_uri })}`);
+    return token;
   }
 
   async healthCheck(orgId: string | null): Promise<boolean> {
@@ -219,17 +277,25 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
 
   async createCall(call: Call): Promise<string | void> {
     const orgId = (call as any).organizationId || null;
-    const client = await this.getClient(orgId);
+    let client;
+    try {
+      client = await this.getClient(orgId);
+    } catch (e) {
+      this.logger.error(`ARI Connection failed: ${e.message}`);
+      throw new TelephonyProviderError(`Cannot connect to Asterisk: ${e.message}`, 'asterisk');
+    }
     
     try {
       const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config', true);
       const bridgeId = `bridge-${call.id}`;
       await client.bridges.create({ type: 'mixing', bridgeId });
 
-      const agentEndpoint = `PJSIP/${call.agentId || 'unknown'}`;
+      const agentEndpoint = `PJSIP/${call.agentId}`;
+      this.logger.log(`Originating call to agent: ${agentEndpoint}`);
+      
       const channel = await client.channels.originate({
         endpoint: agentEndpoint,
-        app: config?.app || 'psynq-app',
+        app: config?.app || this.appConfigService.asteriskConfig.app,
         variables: { 
           CALL_ID: call.id, 
           BRIDGE_ID: bridgeId, 
@@ -240,6 +306,7 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
 
       return channel.id;
     } catch (error) {
+      this.logger.error(`Call Origination failed: ${error.message}`);
       if (error instanceof PsynqException) throw error;
       throw new TelephonyProviderError(`Failed to initiate calling machine: ${error.message}`, 'asterisk', error);
     }
@@ -248,10 +315,10 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
   async dialLegB(orgId: string | null, callId: string, bridgeId: string, destination: string): Promise<void> {
     const client = await this.getClient(orgId);
     const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+    const trunkId = config?.trunkId || this.appConfigService.twilioConfig.trunkId;
     await client.channels.originate({
-      endpoint: config?.endpoint || 'PJSIP/main-trunk',
-      extension: destination,
-      app: config?.app || 'psynq-app',
+      endpoint: `PJSIP/${destination}@${trunkId}`,
+      app: config?.app || this.appConfigService.asteriskConfig.app,
       variables: { CALL_ID: callId, BRIDGE_ID: bridgeId, ROLE: 'customer' }
     });
   }
@@ -319,7 +386,7 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
       const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
       const targetChannel = await client.channels.originate({
           endpoint: `PJSIP/${targetIdentifier}`,
-          app: config?.app || 'psynq-app',
+          app: config?.app || this.appConfigService.asteriskConfig.app,
           variables: { CALL_ID: call.id, BRIDGE_ID: bridgeId }
       });
       
@@ -368,7 +435,7 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
                 const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
                 const supervisorChannel = await client.channels.originate({
                     endpoint: `PJSIP/${supervisorId}`,
-                    app: config?.app || 'psynq-app',
+                    app: config?.app || this.appConfigService.asteriskConfig.app,
                 });
                 
                 const snoopBridge = await client.bridges.create({ type: 'mixing', name: `snoop-${call.id}` });

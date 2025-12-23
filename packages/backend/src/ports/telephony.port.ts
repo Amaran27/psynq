@@ -9,7 +9,7 @@ export interface TelephonyPort {
   /**
    * Generates a provider-specific token or credentials for a client/agent.
    */
-  generateToken(organizationId: string | null, agentId: string): Promise<any>;
+  generateToken(organizationId: string | null, agentId: string, username?: string): Promise<any>;
 
   /**
    * Performs a health check on the telephony provider.

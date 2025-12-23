@@ -5,6 +5,11 @@ import { UserEntity } from './entities/user.entity';
 import { CallParticipantEntity } from './entities/call-participant.entity';
 import { RecordingEntity } from './entities/recording.entity';
 import { SettingEntity } from './entities/setting.entity';
+import { OrganizationEntity } from './entities/organization.entity';
+import { QueueEntity } from './entities/queue.entity';
+import { FlowEntity } from './entities/flow.entity';
+import { RateEntity } from './entities/rate.entity';
+import { WalletEntity } from './entities/wallet.entity';
 
 // DataSource used by TypeORM CLI for migrations and by deployment scripts.
 const AppDataSource = new DataSource({
@@ -14,7 +19,18 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME || 'psynq_user',
   password: process.env.DB_PASSWORD || 'mysecretpassword',
   database: process.env.DB_DATABASE || 'psynq_db',
-  entities: [CallEntity, UserEntity, CallParticipantEntity, RecordingEntity, SettingEntity],
+  entities: [
+    CallEntity, 
+    UserEntity, 
+    CallParticipantEntity, 
+    RecordingEntity, 
+    SettingEntity,
+    OrganizationEntity,
+    QueueEntity,
+    FlowEntity,
+    RateEntity,
+    WalletEntity
+  ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
 });
 

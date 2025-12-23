@@ -1,35 +1,45 @@
 # Dependencies
 node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
 # Build outputs
 dist/
+**/dist/
 build/
+**/build/
 .next/
+**/ .next/
 out/
+**/out/
+.turbo/
+*.tsbuildinfo
 
-# Environment variables
+# Environment variables (Never commit these)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Logs
 logs/
 *.log
+**/logs/
 
 # Runtime data
 pids/
@@ -44,27 +54,42 @@ coverage/
 # Temporary files
 tmp/
 temp/
-
-# Docker
-.dockerignore
-
-# Monorepo specific
-packages/*/node_modules/
-packages/*/dist/
-packages/*/build/
+**/temp/
 
 # Asterisk
 *.wav
 *.mp3
+**/asterisk-config/keys/*.crt
+**/asterisk-config/keys/*.key
+**/asterisk-config/keys/*.csr
+**/asterisk-config/keys/*.pem
 
 # Database
 *.db
 *.sqlite
+data/
+pgdata/
 
 # Testing
 test-results/
 playwright-report/
+blob-report/
+playwright/.cache/
+
+# Flutter/Mobile (packages/mobile)
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/ios/.generated/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
 
 # Deployment
-deploy/*
-deploy/*.*
+# Only ignore generated files or secrets in deploy, not the infra code
+**/asterisk-config/odbc.ini
+**/asterisk-config/res_odbc.conf
+**/asterisk-config/ari.conf

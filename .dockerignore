@@ -1,0 +1,12 @@
+packages/mobile
+temp
+obsolete
+docs
+scripts
+deploy
+.git
+.github
+*.md
+.env*
+node_modules
+packages/*/node_modules

@@ -90,13 +90,11 @@ exten => _+X.,1,NoOp(Outbound call to ${EXTEN} via Twilio)
 
 ## Phase 2: Update Backend Architecture (Week 3-4)
 
-### 2.1 Modify TelephonyRouterAdapter
-Update `packages/backend/src/adapters/telephony-router.adapter.ts`:
-- Route all calls through AsteriskAdapter by default
-- Remove provider selection logic for basic calls
-- Keep provider selection for specific use cases if needed
+### 2.1 Modify TelephonyRouterAdapter (Skipped)
+- [x] **SKIPPED**: Route all calls through AsteriskAdapter by default
+- *Note: Instead of a router adapter, we directly injected `AsteriskAdapter` as the `TELEPHONY_PROVIDER` in `CallModule`.*
 
-### 2.2 Update AsteriskAdapter
+### 2.2 Update AsteriskAdapter (In Progress)
 Enhance `packages/backend/src/adapters/asterisk.adapter.ts`:
 - Add SIP trunk selection logic
 - Implement provider failover in Asterisk dialplan
@@ -112,28 +110,22 @@ Add Asterisk dialplan logic for:
 
 ## Phase 3: Frontend Migration (Week 5-6)
 
-### 3.1 Replace Twilio Voice SDK
-Update frontend packages:
-```bash
-npm uninstall @twilio/voice-sdk
-npm install sip.js
-```
+### 3.1 Replace Twilio Voice SDK (Completed)
+- [x] Uninstall `@twilio/voice-sdk`
+- [x] Install `sip.js`
 
-### 3.2 Create WebRTC Adapter
-Create `packages/web/src/adapters/webrtc-asterisk.adapter.ts`:
-- Implement SIP.js connection to Asterisk
-- Handle authentication and registration
-- Manage audio streams
-- Handle call events
+### 3.2 Create WebRTC Adapter (Completed)
+- [x] Implemented `SipJsAdapter` in `packages/web/src/adapters/sipjs-audio.adapter.ts`
+- [x] Handle authentication and registration
+- [x] Manage audio streams
+- [x] Handle call events
 
-### 3.3 Update Call Components
-Modify React components to use new WebRTC adapter:
-- Update softphone component
-- Change call control buttons
-- Handle connection status
-- Update error handling
+### 3.3 Update Call Components (Completed)
+- [x] Modify React components to use new WebRTC adapter
+- [x] Refactor `SettingsContainer` to remove Twilio UI and enforce Asterisk.
+- [x] Update softphone component logic (using `useAdapterStore`)
 
-### 3.4 Test Browser-to-Asterisk Connection
+### 3.4 Test Browser-to-Asterisk Connection (Next Step)
 - [ ] Verify WebRTC connection to Asterisk
 - [ ] Test audio in both directions
 - [ ] Verify call control functions (mute, hold, transfer)

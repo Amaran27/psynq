@@ -1,1 +1,17 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+
+# Env
+.env*
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/

@@ -1,0 +1,60 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile.dev
+    network_mode: host
+    container_name: psynq-backend-dev
+    volumes:
+      - ./packages/backend:/usr/src/app/packages/backend:delegated
+      - ./packages/core:/usr/src/app/packages/core:delegated
+      - /usr/src/app/packages/backend/node_modules
+      - /usr/src/app/node_modules
+    ports:
+      - "3001:3001"
+      - "9229:9229"
+    environment:
+      - NODE_ENV=development
+      - ASTERISK_WEBRTC_URI=ws://host.docker.internal:8088/ws
+      - DB_HOST=host.docker.internal
+      - DB_PORT=5432
+      - DB_USERNAME=psynq_user
+      - DB_PASSWORD=mysecretpassword
+      - DB_DATABASE=psynq_db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile.dev
+    network_mode: host
+    container_name: psynq-web-dev
+    volumes:
+      - ./packages/web:/usr/src/app/packages/web:delegated
+      - ./packages/core:/usr/src/app/packages/core:delegated
+      - /usr/src/app/packages/web/node_modules
+      - /usr/src/app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+      - NEXT_PUBLIC_API_URL=http://host.docker.internal:3001
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+networks:
+  default:
+    name: psynq-dev

@@ -12,6 +12,7 @@ export class TelephonyController {
   @Post('token')
   async getToken(@Req() req: any, @Body('agentId') agentId: string) {
     const orgId = req.user?.organizationId || null;
-    return this.telephonyProvider.generateToken(orgId, agentId);
+    const username = req.user?.username;
+    return this.telephonyProvider.generateToken(orgId, agentId, username);
   }
 }

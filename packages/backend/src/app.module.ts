@@ -27,6 +27,7 @@ import { QueueEntity } from './entities/queue.entity';
 import { FlowEntity } from './entities/flow.entity';
 import { WalletEntity } from './entities/wallet.entity';
 import { RateEntity } from './entities/rate.entity';
+import { ConfigModule as AppConfigModule } from './config/config.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { RateEntity } from './entities/rate.entity';
       envFilePath: ['.env', '.env.development', '.env.production', '../../.env'],
       isGlobal: true,
     }),
+    AppConfigModule,
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -65,7 +67,6 @@ import { RateEntity } from './entities/rate.entity';
   controllers: [AppController, SettingsController],
   providers: [
     AppService,
-    AppConfigService,
     {
       provide: APP_PIPE,
       useClass: ValidationPipe,

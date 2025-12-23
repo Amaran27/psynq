@@ -1,0 +1,42 @@
+# Development Dockerfile for backend (NestJS)
+FROM node:22-bullseye
+
+WORKDIR /usr/src/app
+
+# Install system dependencies required for building native modules (like mediasoup)
+RUN apt-get update && apt-get install -y \
+    curl \
+    procps \
+    python3 \
+    python3-pip \
+    build-essential \
+    pkg-config \
+    libtool \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install global tools
+RUN npm install -g cross-env @nestjs/cli typescript
+
+# Step 1: Copy manifests first
+COPY package*.json ./
+COPY packages/core/package.json ./packages/core/
+COPY packages/backend/package.json ./packages/backend/
+
+# Step 2: Install dependencies (Reverted to standard npm behavior)
+RUN npm install --workspace=backend --workspace=@psynq/core --include-workspace-root --no-audit --no-fund --legacy-peer-deps
+
+# Step 3: Copy source code
+COPY packages/core ./packages/core
+COPY packages/backend ./packages/backend
+
+# Step 4: Build core
+WORKDIR /usr/src/app/packages/core
+RUN npm run build
+
+# Final Setup
+WORKDIR /usr/src/app/packages/backend
+ENV NODE_ENV=development
+EXPOSE 3001 9229
+
+CMD ["npm", "run", "start:dev"]

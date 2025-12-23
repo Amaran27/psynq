@@ -35,7 +35,7 @@ export class AsteriskConfigDto {
 }
 
 export class TelephonySettingsDto {
-  @IsEnum(['twilio', 'asterisk'])
+  @IsEnum(['asterisk'])
   provider: string;
 
   @IsOptional()

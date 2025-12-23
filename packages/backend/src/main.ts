@@ -39,11 +39,11 @@ async function bootstrap() {
   });
   
   console.log(`Starting backend server in ${configService.nodeEnv} mode`);
-  // Explicitly listen on both IPv4 and IPv6 if possible, or force 127.0.0.1 for local stability
+  // Bind to all interfaces for maximum Windows/Docker compatibility
   const host = '0.0.0.0'; 
   const port = configService.port;
   
   await app.listen(port, host);
-  console.log(`Backend server is listening on http://localhost:${port}`);
+  console.log(`Backend server is listening on http://127.0.0.1:${port}`);
 }
 bootstrap();

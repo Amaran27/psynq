@@ -1,0 +1,83 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Mediasoup Monitoring",
+    "tags": ["mediasoup"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Mediasoup Workers",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "mediasoup_workers_total",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Mediasoup Routers",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "mediasoup_routers_total",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Node.js CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_cpu_user_seconds_total",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Node.js Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes",
+            "refId": "A"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    },
+    "refresh": "5s",
+    "schemaVersion": 27,
+    "version": 0,
+    "links": []
+  }
+}

@@ -1,0 +1,119 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: psynq-postgres
+    environment:
+      - POSTGRES_USER=psynq_user
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_DB=psynq_db
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: psynq-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  asterisk:
+    image: andrius/asterisk:latest
+    container_name: psynq-asterisk
+    restart: unless-stopped
+    ports:
+      - "5060:5060/udp"  # SIP
+      - "8088:8088"      # ARI HTTP
+      - "8089:8089"      # WebRTC WebSocket
+    volumes:
+      - ./asterisk/etc/asterisk:/etc/asterisk
+    environment:
+      - ASTERISK_UID=1000
+      - ASTERISK_GID=1000
+    command: ["asterisk", "-f", "-c"]
+
+  # coturn:
+  #   image: instrumentisto/coturn:4.5.2
+  #   container_name: psynq-coturn
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3478:3478/udp"
+  #     - "3478:3478/tcp"
+  #     command: ["turnserver", "-v", "--no-dtls", "--no-tls", "--listening-port", "3478", "--min-port", "49152", "--max-port", "65535", "--lt-cred-mech", "--realm", "psynq.local", "--user", "testuser:testpass"]
+
+  # mediasoup-worker:
+  #   build: ./worker
+  #   container_name: psynq-mediasoup-worker
+  #   environment:
+  #     - NODE_ENV=production
+  #     - MEDIASOUP_WORKER_PORT=4000
+  #     - MEDIASOUP_WORKER_RTC_PORTS=10000
+  #     ports:
+  #     - "4000:4000"
+  #     - "10000-10100:10000-10100/udp"
+  #   depends_on:
+  #     - coturn
+
+  # mediasoup-signal:
+  #   build: ./signal
+  #   container_name: psynq-mediasoup-signal
+  #   environment:
+  #     - NODE_ENV=production
+  #     - PORT=3002
+  #     - TURN_URIS=turn:coturn:3478
+  #     - TURN_USERNAME=testuser
+  #     - TURN_CREDENTIAL=testpass
+  #   ports:
+  #     - "3002:3002"
+  #   depends_on:
+  #     - mediasoup-worker
+  #     - coturn
+  #     - asterisk
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: psynq-minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - ./minio/data:/data
+    command: server /data
+    ports:
+      - "9000:9000"
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    container_name: psynq-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/psynq-recordings;
+      echo 'Bucket psynq-recordings created';
+      exit 0;
+      "
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: psynq-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: psynq-grafana
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3003:3000"
+
+# Notes:
+# - This compose file is designed for a local production-like environment. Some services (mediasoup-worker) require native builds and proper configuration.
+# - For production deployment consider replacing Docker Compose with a container orchestration platform and enabling TLS/DTLS for TURN and signaling.
