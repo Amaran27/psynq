@@ -1,4 +1,4 @@
-﻿services:
+services:
   postgres:
     image: postgres:15-alpine
     container_name: psynq-postgres-dev
@@ -8,7 +8,6 @@
       - POSTGRES_DB=psynq_db
     volumes:
       - pgdata:/var/lib/postgresql/data
-
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U psynq_user -d psynq_db || exit 1"]
       interval: 10s
@@ -16,26 +15,101 @@
       retries: 10
       start_period: 10s
     restart: unless-stopped
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: psynq-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: psynq-minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    container_name: psynq-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb --ignore-existing myminio/psynq-recordings;
+      echo 'Bucket psynq-recordings created';
+      exit 0;
+      "
+
+  asterisk:
+    build:
+      context: ./deploy/asterisk
+      dockerfile: Dockerfile
+    container_name: psynq-asterisk
+    environment:
+      - ASTERISK_UID=1000
+      - ASTERISK_GID=1000
+      - TZ=UTC
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=psynq_user
+      - DB_PASSWORD=mysecretpassword
+      - DB_DATABASE=psynq_db
+      - ARI_USER=asterisk
+      - ARI_PASSWORD=asterisk
+    ports:
+      - '5060:5060/udp'
+      - '5061:5061/tcp'
+      - '8088:8088'
+      - '8089:8089'
+      - '10000-10100:10000-10100/udp'
+    volumes:
+      - ./deploy/asterisk/asterisk-config:/etc/asterisk:rw
+      - asterisk_var:/var/lib/asterisk
+      - asterisk_spool:/var/spool/asterisk
+      - asterisk_log:/var/log/asterisk
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
   backend:
     build:
       context: .
       dockerfile: packages/backend/Dockerfile
       target: dev
-      # Use host network during build to avoid WSL2 DNS issues
       network: host
       args:
         BUILDKIT_INLINE_CACHE: 1
     container_name: psynq-backend-dev
     working_dir: /usr/src/app/packages/backend
     volumes:
-      # Mount source code for hot reload
       - ./packages/backend/src:/usr/src/app/packages/backend/src:cached
       - ./packages/backend/tsconfig.json:/usr/src/app/packages/backend/tsconfig.json:cached
       - ./packages/backend/nest-cli.json:/usr/src/app/packages/backend/nest-cli.json:cached
-      # Mount core for changes
       - ./packages/core/dist:/usr/src/app/packages/core/dist:cached
-      # Protect node_modules from being overwritten by host
       - backend_node_modules:/usr/src/app/packages/backend/node_modules
       - core_node_modules:/usr/src/app/packages/core/node_modules
     ports:
@@ -43,19 +117,31 @@
       - "9229:9229"
     environment:
       - NODE_ENV=development
-      - ASTERISK_WEBRTC_URI=ws://host.docker.internal:8088/ws
+      # Internal Docker networking
+      - ASTERISK_WEBRTC_URI=ws://asterisk:8088/ws
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USERNAME=psynq_user
       - DB_PASSWORD=mysecretpassword
       - DB_DATABASE=psynq_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=psynq-recordings
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      asterisk:
+        condition: service_started
     dns:
       - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:3001/health || exit 1"]
       interval: 10s
@@ -68,31 +154,28 @@
     build:
       context: .
       dockerfile: packages/web/Dockerfile.frontend.dev
-      # Use host network during build to avoid WSL2 DNS issues
       network: host
       args:
         BUILDKIT_INLINE_CACHE: 1
     container_name: psynq-web-dev
     working_dir: /usr/src/app/packages/web
     volumes:
-      # Mount source code for hot reload
       - ./packages/web/src:/usr/src/app/packages/web/src:cached
       - ./packages/web/public:/usr/src/app/packages/web/public:cached
-      # Core source is mounted so we can rebuild it if needed, but NOT dist
       - ./packages/core/src:/usr/src/app/packages/core/src:cached
-      # Note: keep node_modules from the image so `next` installed at build time is available
+      - web_node_modules:/usr/src/app/packages/web/node_modules
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
-      - NEXT_PUBLIC_API_URL=http://host.docker.internal:3001
-    # Use Webpack for dev instead of Turbopack to avoid unstable restart loops
+      # Browser must access API from outside (localhost), but internal SSR might need internal names
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      # WebRTC is client-side, so it accesses Asterisk via localhost mapped port
+      - NEXT_PUBLIC_ASTERISK_WS=ws://localhost:8088/ws
     command: ["/bin/sh", "-c", "rm -rf packages/web/next.config.js && npm run build --workspace=@psynq/core && npm run dev -- --webpack"]
     dns:
       - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
     depends_on:
       backend:
         condition: service_healthy
@@ -112,5 +195,10 @@ networks:
 volumes:
   backend_node_modules:
   core_node_modules:
+  web_node_modules:
   web_next:
   pgdata:
+  minio_data:
+  asterisk_var:
+  asterisk_spool:
+  asterisk_log:
