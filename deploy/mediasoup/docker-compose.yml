@@ -9,7 +9,7 @@ services:
     volumes:
       - ./postgres/data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     restart: unless-stopped
 
   redis:
@@ -19,20 +19,20 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
-  asterisk:
-    image: andrius/asterisk:latest
-    container_name: psynq-asterisk
-    restart: unless-stopped
-    ports:
-      - "5060:5060/udp"  # SIP
-      - "8088:8088"      # ARI HTTP
-      - "8089:8089"      # WebRTC WebSocket
-    volumes:
-      - ./asterisk/etc/asterisk:/etc/asterisk
-    environment:
-      - ASTERISK_UID=1000
-      - ASTERISK_GID=1000
-    command: ["asterisk", "-f", "-c"]
+  # asterisk:
+  #   image: andrius/asterisk:latest
+  #   container_name: psynq-asterisk
+  #   restart: unless-stopped
+  #   ports:
+  #     - "5060:5060/udp"  # SIP
+  #     - "8088:8088"      # ARI HTTP
+  #     - "8089:8089"      # WebRTC WebSocket
+  #   volumes:
+  #     - ./asterisk/etc/asterisk:/etc/asterisk
+  #   environment:
+  #     - ASTERISK_UID=1000
+  #     - ASTERISK_GID=1000
+  #   command: ["asterisk", "-f", "-c"]
 
   # coturn:
   #   image: instrumentisto/coturn:4.5.2
@@ -43,34 +43,30 @@ services:
   #     - "3478:3478/tcp"
   #     command: ["turnserver", "-v", "--no-dtls", "--no-tls", "--listening-port", "3478", "--min-port", "49152", "--max-port", "65535", "--lt-cred-mech", "--realm", "psynq.local", "--user", "testuser:testpass"]
 
-  # mediasoup-worker:
-  #   build: ./worker
-  #   container_name: psynq-mediasoup-worker
-  #   environment:
-  #     - NODE_ENV=production
-  #     - MEDIASOUP_WORKER_PORT=4000
-  #     - MEDIASOUP_WORKER_RTC_PORTS=10000
-  #     ports:
-  #     - "4000:4000"
-  #     - "10000-10100:10000-10100/udp"
-  #   depends_on:
-  #     - coturn
+  mediasoup-worker:
+    image: kolychevoleg/mediasoup-docker:latest
+    container_name: psynq-mediasoup-worker
+    environment:
+      - NODE_ENV=production
+      - MEDIASOUP_WORKER_PORT=4000
+      - MEDIASOUP_WORKER_RTC_PORTS=10000
+    ports:
+      - "4000:4000"
+      - "11000-11100:10000-10100/udp"
+    restart: unless-stopped
 
-  # mediasoup-signal:
-  #   build: ./signal
-  #   container_name: psynq-mediasoup-signal
-  #   environment:
-  #     - NODE_ENV=production
-  #     - PORT=3002
-  #     - TURN_URIS=turn:coturn:3478
-  #     - TURN_USERNAME=testuser
-  #     - TURN_CREDENTIAL=testpass
-  #   ports:
-  #     - "3002:3002"
-  #   depends_on:
-  #     - mediasoup-worker
-  #     - coturn
-  #     - asterisk
+  mediasoup-signal:
+    image: vanjoge/mediasoup-demo:latest
+    container_name: psynq-mediasoup-signal
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+    ports:
+      - "3002:3002"
+    depends_on:
+      - mediasoup-worker
+      # - asterisk
+    restart: unless-stopped
 
   minio:
     image: quay.io/minio/minio:latest

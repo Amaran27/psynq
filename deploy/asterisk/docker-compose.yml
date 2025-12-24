@@ -35,7 +35,7 @@ services:
       - psynq-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "asterisk", "-rx", "core show uptime"]
+      test: ["CMD-SHELL", "asterisk -rx 'core show version' || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

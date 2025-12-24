@@ -10,18 +10,18 @@ services:
     command: ["turnserver", "-v", "--no-dtls", "--no-tls", "--listening-port", "3478", "--min-port", "49152", "--max-port", "65535", "--lt-cred-mech", "--realm", "psynq.local", "--user", "testuser:testpass"]
     # Note: this is for local dev only. For production, configure long-term shared secret and TLS.
 
-  janus:
-    image: meetecho/janus-gateway:1.0.0
-    container_name: psynq-janus
-    restart: unless-stopped
-    ports:
-      - "8088:8088"   # HTTP admin API and demos
-      - "7088:7088"   # Admin websockets (if used)
-      - "10000-10200:10000-10200/udp" # RTP (adjust range as needed)
-    environment:
-      - "JANUS_LOG_LEVEL=4"
-    volumes:
-      - ./janus-config:/usr/local/etc/janus
+  # janus:
+  #   image: meetecho/janus-gateway:latest
+  #   container_name: psynq-janus
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8087:8088"   # HTTP admin API and demos
+  #     - "7088:7088"   # Admin websockets (if used)
+  #     - "10000-10200:10000-10200/udp" # RTP (adjust range as needed)
+  #   environment:
+  #     - "JANUS_LOG_LEVEL=4"
+  #   volumes:
+  #     - ./janus-config:/usr/local/etc/janus
 
 # Usage:
 #  cd deploy/rtc && docker-compose up -d

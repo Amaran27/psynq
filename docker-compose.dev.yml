@@ -1,50 +1,98 @@
-services:
+﻿services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: psynq-postgres-dev
+    environment:
+      - POSTGRES_USER=psynq_user
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_DB=psynq_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U psynq_user -d psynq_db || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   backend:
     build:
       context: .
-      dockerfile: packages/backend/Dockerfile.dev
-    network_mode: host
+      dockerfile: packages/backend/Dockerfile
+      target: dev
+      # Use host network during build to avoid WSL2 DNS issues
+      network: host
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     container_name: psynq-backend-dev
+    working_dir: /usr/src/app/packages/backend
     volumes:
-      - ./packages/backend:/usr/src/app/packages/backend:delegated
-      - ./packages/core:/usr/src/app/packages/core:delegated
-      - /usr/src/app/packages/backend/node_modules
-      - /usr/src/app/node_modules
+      # Mount source code for hot reload
+      - ./packages/backend/src:/usr/src/app/packages/backend/src:cached
+      - ./packages/backend/tsconfig.json:/usr/src/app/packages/backend/tsconfig.json:cached
+      - ./packages/backend/nest-cli.json:/usr/src/app/packages/backend/nest-cli.json:cached
+      # Mount core for changes
+      - ./packages/core/dist:/usr/src/app/packages/core/dist:cached
+      # Protect node_modules from being overwritten by host
+      - backend_node_modules:/usr/src/app/packages/backend/node_modules
+      - core_node_modules:/usr/src/app/packages/core/node_modules
     ports:
       - "3001:3001"
       - "9229:9229"
     environment:
       - NODE_ENV=development
       - ASTERISK_WEBRTC_URI=ws://host.docker.internal:8088/ws
-      - DB_HOST=host.docker.internal
+      - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USERNAME=psynq_user
       - DB_PASSWORD=mysecretpassword
       - DB_DATABASE=psynq_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://127.0.0.1:3001/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 15
+      start_period: 40s
     restart: unless-stopped
 
   web:
     build:
       context: .
-      dockerfile: packages/web/Dockerfile.dev
-    network_mode: host
+      dockerfile: packages/web/Dockerfile.frontend.dev
+      # Use host network during build to avoid WSL2 DNS issues
+      network: host
+      args:
+        BUILDKIT_INLINE_CACHE: 1
     container_name: psynq-web-dev
+    working_dir: /usr/src/app/packages/web
     volumes:
-      - ./packages/web:/usr/src/app/packages/web:delegated
-      - ./packages/core:/usr/src/app/packages/core:delegated
-      - /usr/src/app/packages/web/node_modules
-      - /usr/src/app/node_modules
+      # Mount source code for hot reload
+      - ./packages/web/src:/usr/src/app/packages/web/src:cached
+      - ./packages/web/public:/usr/src/app/packages/web/public:cached
+      # Core source is mounted so we can rebuild it if needed, but NOT dist
+      - ./packages/core/src:/usr/src/app/packages/core/src:cached
+      # Note: keep node_modules from the image so `next` installed at build time is available
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
       - NEXT_PUBLIC_API_URL=http://host.docker.internal:3001
+    # Use Webpack for dev instead of Turbopack to avoid unstable restart loops
+    command: ["/bin/sh", "-c", "rm -rf packages/web/next.config.js && npm run build --workspace=@psynq/core && npm run dev -- --webpack"]
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     depends_on:
       backend:
         condition: service_healthy
@@ -53,8 +101,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+      start_period: 30s
     restart: unless-stopped
 
 networks:
   default:
     name: psynq-dev
+    driver: bridge
+
+volumes:
+  backend_node_modules:
+  core_node_modules:
+  web_next:
+  pgdata:

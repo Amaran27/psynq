@@ -1,0 +1,59 @@
+# Use official Node.js LTS image
+FROM node:22-bullseye-slim
+
+# Install curl for health checks (with retries to tolerate transient network failures)
+RUN apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Base image with minimal tools
+FROM node:22-bullseye-slim AS base
+
+RUN apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+
+# Copy root package files and lockfile for deterministic installs
+COPY package*.json ./
+COPY package-lock.json ./
+
+# Copy web package.json so workspace install can resolve web deps
+COPY packages/web/package*.json packages/web/
+
+# Configure npm to be more tolerant of transient issues
+RUN npm config set registry https://registry.npmjs.org/ && npm set fetch-retries 5
+
+# Install workspace deps in a dedicated layer using BuildKit cache for npm
+FROM base AS deps
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm ci --workspace=web --prefer-offline --no-audit --no-fund --loglevel=info
+
+# Final image: copy installed node_modules from deps stage and add source
+FROM node:22-bullseye-slim AS final
+RUN apt-get -o Acquire::Retries=3 update && apt-get -o Acquire::Retries=3 install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/app
+
+# Copy installed deps from deps stage (root node_modules)
+COPY --from=deps /usr/src/app/node_modules /usr/src/app/node_modules
+
+# Ensure workspace scripts can access .bin tools (hoisted deps at root)
+RUN mkdir -p /usr/src/app/packages/web/node_modules \
+    && ln -sf /usr/src/app/node_modules/.bin /usr/src/app/packages/web/node_modules/.bin || true
+
+# Copy application source
+COPY . .
+
+# Build core package to ensure it's ready
+RUN npm run build --workspace=@psynq/core
+
+# Expose frontend port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
+
+# Start development server (no runtime installs; deps are embedded)
+CMD ["npm", "run", "dev"]
