@@ -3,8 +3,10 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    image: psynq-asterisk-realtime
+    image: psynq-asterisk
     container_name: psynq-asterisk
+    env_file:
+      - ../../packages/backend/.env
     environment:
       - ASTERISK_UID=${ASTERISK_UID}
       - ASTERISK_GID=${ASTERISK_GID}
