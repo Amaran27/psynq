@@ -1,0 +1,11 @@
+### Page state
+- Page URL: https://sip2sip.info/doc/asterisk
+- Page Title: 404 Not Found
+- Page Snapshot:
+```yaml
+- generic [active] [ref=e1]:
+  - heading "Not Found" [level=1] [ref=e2]
+  - paragraph [ref=e3]: The requested URL was not found on this server.
+  - separator [ref=e4]
+  - generic [ref=e5]: Apache Server at sip2sip.info Port 80
+```
