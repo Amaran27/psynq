@@ -1,6 +1,14 @@
 # Psynq Quick Setup Guide
 
-## 🚀 One-Command Setup (Windows, Mac, Linux)
+## � Documentation
+
+**For complete system specification and current status, see [.ai/spec.md](.ai/spec.md)** - This is the single source of truth for:
+- Current implementation state
+- Architecture and deployment details
+- Known issues and fixes
+- Development roadmap
+
+## �🚀 One-Command Setup (Windows, Mac, Linux)
 
 ### Prerequisites
 - Docker Desktop installed and running
