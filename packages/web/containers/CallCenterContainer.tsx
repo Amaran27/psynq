@@ -44,7 +44,7 @@ export function CallCenterContainer() {
     isAuthenticated,
   } = useAuthStore();
 
-  const { initializeAdapter, apiAdapter } = useAdapterStore();
+  const { initializeAdapter, apiAdapter, initializeAudioAdapterOnDemand } = useAdapterStore();
 
   // Initialize API adapter
   useEffect(() => {
@@ -85,7 +85,21 @@ export function CallCenterContainer() {
         updateCall(updatedCall);
       }, token);
 
-      const unsubscribeNewCalls = apiAdapter.subscribeToNewCalls((newCall: Call) => {
+      const unsubscribeNewCalls = apiAdapter.subscribeToNewCalls(async (newCall: Call) => {
+        // For inbound calls, initialize SIP.js on-demand before adding the call
+        // IMPORTANT: Only initialize SIP.js for TRUE inbound calls (from PSTN)
+        // Outbound calls via ARI also start in RINGING state, so we must check direction
+        console.log('[CallCenterContainer] 📞 New call received:', { direction: newCall.direction, state: newCall.state });
+        if (newCall.direction === 'inbound' && newCall.state === CallState.RINGING) {
+          console.log('%c[CallCenterContainer] 📞 Inbound call detected, initializing SIP.js...', 'color: #2196F3');
+          try {
+            await initializeAudioAdapterOnDemand();
+          } catch (err) {
+            console.error('[CallCenterContainer] Failed to initialize SIP.js for inbound call:', err);
+          }
+        } else {
+          console.log('[CallCenterContainer] 📞 Call is NOT inbound+ringing, skipping SIP.js initialization');
+        }
         addCall(newCall);
       }, token);
 

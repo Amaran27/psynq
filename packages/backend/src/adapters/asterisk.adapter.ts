@@ -152,13 +152,15 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
       );
 
       // Upsert endpoint (ps_endpoints)
+      // FIX: Add contact_reject_unknown_contact_header=no to prevent ASTERISK-30042 bug
+      // This stops Asterisk from rewriting Contact header with x-ast-orig-host parameter
       await qr.query(
         `INSERT INTO ps_endpoints (
-            id, transport, aors, context, disallow, allow, rewrite_contact, force_rport, rtp_symmetric, auth
+            id, transport, aors, context, disallow, allow, rewrite_contact, force_rport, rtp_symmetric, auth, contact_reject_unknown_contact_header
          ) VALUES (
-            $1, $2, $3, $4, 'all', 'ulaw', 'yes', 'yes', 'yes', $5
+            $1, $2, $3, $4, 'all', 'ulaw', 'yes', 'yes', 'yes', $5, 'no'
          )
-         ON CONFLICT (id) DO UPDATE SET aors = $3, auth = $5`,
+         ON CONFLICT (id) DO UPDATE SET aors = $3, auth = $5, contact_reject_unknown_contact_header = 'no'`,
         [sipUsername, this.appConfigService.asteriskConfig.transport, sipUsername, this.appConfigService.asteriskConfig.context, sipUsername]
       );
 

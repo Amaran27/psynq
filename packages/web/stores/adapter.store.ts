@@ -14,6 +14,7 @@ interface AdapterState {
 
 interface AdapterActions {
   initializeAdapter: () => void;
+  initializeAudioAdapterOnDemand: () => Promise<void>;
 }
 
 export const useAdapterStore = create<AdapterState & AdapterActions>((set, get) => ({
@@ -30,6 +31,30 @@ export const useAdapterStore = create<AdapterState & AdapterActions>((set, get) 
     if (!get().audioAdapter) {
       // Defaulting to SipJs (Asterisk) for our new architecture
       set({ audioAdapter: new SipJsAdapter() });
+    }
+  },
+  initializeAudioAdapterOnDemand: async () => {
+    console.log('[AdapterStore] 🔍 initializeAudioAdapterOnDemand called');
+    const audioAdapter = get().audioAdapter;
+    if (!audioAdapter) {
+      console.error('[AdapterStore] Audio adapter not initialized');
+      return;
+    }
+    
+    // Check if already initialized using the new isReady() method
+    const sipAdapter = audioAdapter as any;
+    console.log('[AdapterStore] 🔍 Checking if SIP adapter is ready...');
+    if (sipAdapter.isReady && sipAdapter.isReady()) {
+      console.log('[AdapterStore] Audio adapter already initialized, skipping');
+      return;
+    }
+    
+    console.log('[AdapterStore] 🔍 SIP adapter not initialized, proceeding with initialization...');
+    // Perform actual SIP.js initialization
+    if (sipAdapter.performInitialization) {
+      console.log('%c[AdapterStore] 🔄 Calling performInitialization()...', 'color: #2196F3; font-weight: bold');
+      await sipAdapter.performInitialization();
+      console.log('%c[AdapterStore] ✅ performInitialization() completed', 'color: #4CAF50; font-weight: bold');
     }
   },
 }));

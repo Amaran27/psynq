@@ -1,21 +1,10 @@
-FROM debian:bullseye-slim
+# Use community-recommended Asterisk image (andrius/asterisk)
+# Reference: https://community.asterisk.org/t/are-there-any-official-good-docker-images-available/92609
+# This is the de-facto standard with 10M+ pulls and active maintenance
+FROM andrius/asterisk:latest
 
-USER root
+# TEMPORARY: Test with default configs first to ensure Asterisk 22.7.0 starts
+# We'll selectively add our custom configs after confirming base image works
 
-# Install Asterisk, ODBC drivers and gettext-base for envsubst
-RUN apt-get update && apt-get install -y \
-    asterisk \
-    unixodbc \
-    odbc-postgresql \
-    gettext-base \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Create dummy file and give ownership to asterisk user for runtime substitution
-RUN touch /etc/odbc.ini && chown asterisk:asterisk /etc/odbc.ini
-
-# USER asterisk
-
-ENTRYPOINT ["/entrypoint.sh"]
+# The image is already configured with Asterisk
+# Just use the default entrypoint

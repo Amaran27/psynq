@@ -80,11 +80,11 @@ export class HttpCallApiAdapter implements CallApiPort {
     return this.handleResponse(response);
   }
 
-  async createCall(from: string, to: string, token: string): Promise<Call> {
+  async createCall(from: string, to: string, token: string, agentId?: string): Promise<Call> {
     const response = await fetch(`${this.baseUrl}/calls`, {
       method: 'POST',
       headers: this.getAuthHeaders(token),
-      body: JSON.stringify({ from, to }),
+      body: JSON.stringify({ from, to, agentId }),
     });
     return this.handleResponse(response);
   }
@@ -133,10 +133,37 @@ export class HttpCallApiAdapter implements CallApiPort {
 
   private ensureSocket(token: string) {
     if (this.socket?.connected) return this.socket;
+
+    console.log(`%c[HttpCallApiAdapter] Connecting to backend WebSocket at ${this.baseUrl}`, 'color: #2196F3');
+
     this.socket = io(this.baseUrl, {
       auth: { token }, // Correct way to pass token in browser
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
+
+    // Add connection event handlers for better debugging
+    this.socket.on('connect', () => {
+      console.log('%c[HttpCallApiAdapter] ✅ WebSocket connected successfully', 'color: #4CAF50; font-weight: bold');
+    });
+
+    this.socket.on('connect_error', (error) => {
+      // Only log the first error to avoid spam
+      if (!this.socket?.connected) {
+        console.warn(
+          '%c[HttpCallApiAdapter] ⚠️ WebSocket connection failed (will retry automatically)',
+          'color: #FF9800; font-style: italic'
+        );
+        console.log('[HttpCallApiAdapter] This is normal if backend is still starting up...');
+      }
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('[HttpCallApiAdapter] WebSocket disconnected:', reason);
+    });
+
     return this.socket;
   }
 

@@ -1,0 +1,16 @@
+# Ignore files that aren't needed in Docker build context
+*
+!Dockerfile
+!entrypoint.sh
+!.dockerignore
+
+# Ignore config files (mounted as volumes)
+asterisk-config/
+!asterisk-config/keys/*.pem
+!asterisk-config/keys/*.crt
+!asterisk-config/keys/*.key
+
+# Ignore documentation
+*.md
+docs/
+README.md

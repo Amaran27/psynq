@@ -40,7 +40,7 @@ export const useCallStore = create<CallStore>((set, get) => ({
   isMuted: false,
   tips: [],
 
-  // Initialize Telephony via AudioPort
+  // Initialize Telephony via AudioPort (backend WebSocket only, SIP.js deferred)
   initializeTelephony: async (agentId: string, authToken: string) => {
     const { apiAdapter, audioAdapter } = useAdapterStore.getState();
     if (!apiAdapter || !audioAdapter) {
@@ -52,12 +52,18 @@ export const useCallStore = create<CallStore>((set, get) => ({
       // 1. Get dynamic SIP/WebRTC credentials from backend
       const telephonyConfig = await apiAdapter.getTelephonyToken(agentId, authToken);
       
-      // 2. Initialize Audio Adapter (SipJs / Asterisk)
+      // 2. Store config in audio adapter but defer SIP.js initialization
+      // SIP.js will be initialized on-demand when an inbound call is received
       await audioAdapter.initialize(telephonyConfig);
 
+      // Set up audio adapter status callback for when SIP.js is initialized
       audioAdapter.onStatusChange((status) => {
         set({ isAudioReady: status.isReady, isMuted: status.isMuted });
       });
+      
+      // For outbound calls, we don't need SIP.js - backend ARI handles everything
+      // So we can consider audio "ready" for outbound dialpad immediately
+      set({ isAudioReady: true });
 
       audioAdapter.onIncomingCall((callId, from) => {
         console.log(`Incoming call from ${from}`);
@@ -86,6 +92,7 @@ export const useCallStore = create<CallStore>((set, get) => ({
         }
       }, authToken);
 
+      console.log('%c[CallStore] ✅ Telephony initialized (backend WebSocket only, SIP.js deferred)', 'color: #4CAF50; font-weight: bold');
       set({ error: null });
     } catch (err) {
       console.error('Failed to initialize telephony:', err);

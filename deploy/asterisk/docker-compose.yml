@@ -24,6 +24,7 @@ services:
     # ARI ports: 8088/tcp, 8089/tcp
     # RTP ports: 10000-10100/udp
     volumes:
+      # Mount custom Asterisk configurations (Twilio SIP trunk, dialplan, etc.)
       - ./asterisk-config:/etc/asterisk:rw
       - asterisk-var:/var/lib/asterisk
       - asterisk-spool:/var/spool/asterisk

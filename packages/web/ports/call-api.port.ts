@@ -12,7 +12,7 @@ export interface CallApiPort {
   // Call CRUD operations
   getActiveCalls(token: string): Promise<Call[]>;
   getCall(callId: string, token: string): Promise<Call>;
-  createCall(from: string, to: string, token: string): Promise<Call>;
+  createCall(from: string, to: string, token: string, agentId?: string): Promise<Call>;
 
   // Call actions
   answerCall(callId: string, agentId: string, token: string): Promise<Call>;

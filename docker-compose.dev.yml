@@ -81,6 +81,7 @@ services:
       - ARI_USER=psynq-app
       - ARI_PASSWORD=psynq-pass
     volumes:
+      # Mount custom Asterisk configurations (Twilio SIP trunk, dialplan, etc.)
       - ./deploy/asterisk/asterisk-config:/etc/asterisk:rw
       - asterisk_var:/var/lib/asterisk
       - asterisk_spool:/var/spool/asterisk
