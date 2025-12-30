@@ -77,44 +77,9 @@ export class SipJsAdapter implements AudioPort {
     // 3. Let Asterisk auto-generate Contact header
     //
     // This follows RFC 3261 Section 10.2.1.2 and SIP.js best practices
-    // See: https://issues.asterisk.org/jira/browse/ASTERISK-30042
-
-    // Custom logger to suppress only known, non-actionable SIP.js internal errors
-    const customLogger = {
-      error: (category: string, content: string) => {
-        // Completely suppress known SIP.js internal errors that are not actionable
-        const suppressedErrors = [
-          'Not connected',
-          'Transport error occurred',
-          'Failed to send initial outgoing request',
-          'No Contact header pointing to us',
-          'dropping response',
-          'User agent client request transport error',
-          '503 Service Unavailable'
-        ];
-        const shouldSuppress = suppressedErrors.some(err => content.includes(err));
-
-        if (!shouldSuppress) {
-          console.error(`[SIP.js ${category}] ${content}`);
-        }
-        // NEVER log to console for suppressed errors (prevents Next.js interception)
-      },
-      warn: (category: string, content: string) => {
-        // Suppress all warnings related to Contact header issues
-        const suppressedWarnings = [
-          'No Contact header pointing to us',
-          'dropping response'
-        ];
-        const shouldSuppress = suppressedWarnings.some(warn => content.includes(warn));
-
-        if (!shouldSuppress) {
-          console.warn(`[SIP.js ${category}] ${content}`);
-        }
-      },
-      log: () => {},
-      debug: () => {},
-      trace: () => {}
-    };
+    // NOTE: ASTERISK-30042 bug is FIXED in Asterisk 22.7.0
+    // The custom logger suppression has been removed to prove errors are truly gone
+    // If you see "No Contact header" errors, it means Asterisk needs to be upgraded
 
     const userAgentOptions: UserAgentOptions = {
       uri,
@@ -127,7 +92,7 @@ export class SipJsAdapter implements AudioPort {
       // REMOVED: contactName: user
       // Reason: Causes ASTERISK-30042 registration bug on Asterisk 16.x
       // Workaround: Use default SIP.js registration (verifies user part only)
-      logLevel: 'error',
+      logLevel: 'debug',  // Changed to 'debug' to show ALL messages (prove nothing is hidden)
       delegate: {
         onConnect: () => {
           console.log('%c[SipJsAdapter] ✅ WebSocket transport connected', 'color: #4CAF50; font-weight: bold');
