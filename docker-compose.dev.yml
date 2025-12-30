@@ -8,6 +8,8 @@ services:
       - POSTGRES_DB=psynq_db
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Mount database initialization scripts
+      - ./deploy/db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U psynq_user -d psynq_db || exit 1"]
       interval: 10s
@@ -89,6 +91,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show version' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   backend:
@@ -139,7 +147,7 @@ services:
       minio:
         condition: service_healthy
       asterisk:
-        condition: service_started
+        condition: service_healthy
     dns:
       - 8.8.8.8
     healthcheck:

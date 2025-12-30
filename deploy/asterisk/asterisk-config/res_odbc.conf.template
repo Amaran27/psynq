@@ -1,9 +1,11 @@
 [psynq]
 enabled => yes
-dsn => psynq-postgres
+dsn => psynq
 pre-connect => yes
 max_connections => 5
 username => ${DB_USER}
 password => ${DB_PASSWORD}
 limit_backend => yes
 dont_share_connections => yes
+encoding => UTF8
+isolation = read committed
