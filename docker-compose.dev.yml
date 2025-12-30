@@ -85,6 +85,9 @@ services:
     volumes:
       # Mount custom Asterisk configurations (Twilio SIP trunk, dialplan, etc.)
       - ./deploy/asterisk/asterisk-config:/etc/asterisk:rw
+      # Mount ODBC configuration files
+      - ./deploy/asterisk/odbc-config/odbc.ini:/etc/odbc.ini:ro
+      - ./deploy/asterisk/odbc-config/odbcinst.ini:/etc/odbcinst.ini:ro
       - asterisk_var:/var/lib/asterisk
       - asterisk_spool:/var/spool/asterisk
       - asterisk_log:/var/log/asterisk

@@ -3,8 +3,17 @@
 # This is the de-facto standard with 10M+ pulls and active maintenance
 FROM andrius/asterisk:latest
 
-# TEMPORARY: Test with default configs first to ensure Asterisk 22.7.0 starts
-# We'll selectively add our custom configs after confirming base image works
+# Switch to root to install packages
+USER root
+
+# Install PostgreSQL ODBC driver for CDR logging
+RUN apt-get update && apt-get install -y \
+    odbc-postgresql \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to asterisk user
+USER asterisk
 
 # The image is already configured with Asterisk
 # Just use the default entrypoint
