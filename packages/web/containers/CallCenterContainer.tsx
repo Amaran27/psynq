@@ -147,7 +147,10 @@ export function CallCenterContainer() {
   const handleCreateCall = async (to: string) => {
     if (!token) return;
     try {
-      const from = 'system'; // Or agent specific number
+      // IMPORTANT: Use username (not UUID) as 'from' to match Asterisk endpoint
+      // Asterisk PJSIP endpoints are named after usernames (e.g., 'sysadmin')
+      // not UUIDs (e.g., '1fb065c8-dc7e-4e33-9101-cbae8b955434')
+      const from = user?.username || user?.id || 'sysadmin';
       await createCall(from, to, token);
     } catch (err) {
       console.error('Failed to create call:', err);

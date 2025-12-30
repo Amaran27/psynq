@@ -68,23 +68,18 @@ services:
       context: ./deploy/asterisk
       dockerfile: Dockerfile
     container_name: psynq-asterisk
+    network_mode: host
     environment:
       - ASTERISK_UID=1000
       - ASTERISK_GID=1000
       - TZ=UTC
-      - DB_HOST=postgres
+      - DB_HOST=127.0.0.1
       - DB_PORT=5432
       - DB_USER=psynq_user
       - DB_PASSWORD=mysecretpassword
       - DB_DATABASE=psynq_db
-      - ARI_USER=asterisk
-      - ARI_PASSWORD=asterisk
-    ports:
-      - '5060:5060/udp'
-      - '5061:5061/tcp'
-      - '8088:8088'
-      - '8089:8089'
-      - '10000-10100:10000-10100/udp'
+      - ARI_USER=psynq-app
+      - ARI_PASSWORD=psynq-pass
     volumes:
       - ./deploy/asterisk/asterisk-config:/etc/asterisk:rw
       - asterisk_var:/var/lib/asterisk
@@ -100,10 +95,10 @@ services:
       context: .
       dockerfile: packages/backend/Dockerfile
       target: dev
-      network: host
       args:
         BUILDKIT_INLINE_CACHE: 1
     container_name: psynq-backend-dev
+    network_mode: host
     working_dir: /usr/src/app/packages/backend
     volumes:
       - ./packages/backend/src:/usr/src/app/packages/backend/src:cached
@@ -112,21 +107,25 @@ services:
       - ./packages/core/dist:/usr/src/app/packages/core/dist:cached
       - backend_node_modules:/usr/src/app/packages/backend/node_modules
       - core_node_modules:/usr/src/app/packages/core/node_modules
-    ports:
-      - "3001:3001"
-      - "9229:9229"
     environment:
       - NODE_ENV=development
-      # Internal Docker networking
-      - ASTERISK_WEBRTC_URI=ws://asterisk:8088/ws
-      - DB_HOST=postgres
+      # Internal Docker networking - using host IP since backend uses host network
+      - ASTERISK_WEBRTC_URI=ws://127.0.0.1:8088/ws
+      - ASTERISK_ARI_URL=http://127.0.0.1:8088
+      - ASTERISK_ARI_USERNAME=psynq-app
+      - ASTERISK_ARI_PASSWORD=psynq-pass
+      - ASTERISK_APP=psynq-app
+      - ASTERISK_WEBRTC_DOMAIN=127.0.0.1
+      - ASTERISK_TRANSPORT=transport-ws
+      - ASTERISK_CONTEXT=from-webrtc
+      - DB_HOST=127.0.0.1
       - DB_PORT=5432
       - DB_USERNAME=psynq_user
       - DB_PASSWORD=mysecretpassword
       - DB_DATABASE=psynq_db
-      - REDIS_HOST=redis
+      - REDIS_HOST=127.0.0.1
       - REDIS_PORT=6379
-      - MINIO_ENDPOINT=minio
+      - MINIO_ENDPOINT=127.0.0.1
       - MINIO_PORT=9000
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
@@ -154,18 +153,16 @@ services:
     build:
       context: .
       dockerfile: packages/web/Dockerfile.frontend.dev
-      network: host
       args:
         BUILDKIT_INLINE_CACHE: 1
     container_name: psynq-web-dev
+    network_mode: host
     working_dir: /usr/src/app/packages/web
     volumes:
       - ./packages/web/src:/usr/src/app/packages/web/src:cached
       - ./packages/web/public:/usr/src/app/packages/web/public:cached
       - ./packages/core/src:/usr/src/app/packages/core/src:cached
       - web_node_modules:/usr/src/app/packages/web/node_modules
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1

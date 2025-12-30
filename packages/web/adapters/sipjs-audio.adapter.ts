@@ -32,6 +32,18 @@ export class SipJsAdapter implements AudioPort {
         throw new Error('Failed to create SIP URI from: ' + uriStr);
       }
 
+    // Industry Standard Configuration for Asterisk WebRTC
+    // Reference: ASTERISK-30042 bug (affects Asterisk 16.x and 18.0-18.7)
+    // Bug: Asterisk rewrites Contact header with x-ast-orig-host parameter
+    // when contactName is specified, causing SIP.js registration to fail.
+    // 
+    // STANDARD WORKAROUND (per Asterisk community):
+    // 1. Do NOT use custom contactName on Asterisk < 18.8
+    // 2. Use SIP.js default lenient registration mode
+    // 3. Let Asterisk auto-generate Contact header
+    //
+    // This follows RFC 3261 Section 10.2.1.2 and SIP.js best practices
+    // See: https://issues.asterisk.org/jira/browse/ASTERISK-30042
     const userAgentOptions: UserAgentOptions = {
       uri,
       transportOptions: {
@@ -40,6 +52,9 @@ export class SipJsAdapter implements AudioPort {
       displayName: config.displayName?.trim() || user,
       authorizationUsername: user,
       authorizationPassword: pass,
+      // REMOVED: contactName: user
+      // Reason: Causes ASTERISK-30042 registration bug on Asterisk 16.x
+      // Workaround: Use default SIP.js registration (verifies user part only)
     };
 
     console.log('[SipJsAdapter] UserAgent transport server:', userAgentOptions.transportOptions?.server);
@@ -58,8 +73,18 @@ export class SipJsAdapter implements AudioPort {
     };
 
     await this.userAgent.start();
-    await this.registerer.register();
+    
+    // Notify status immediately when UserAgent is ready (WebSocket connected)
+    // SIP registration is optional for outbound calls via ARI
     this.notifyStatus();
+    
+    // Attempt registration, but don't fail if it doesn't work
+    try {
+      await this.registerer.register();
+    } catch (err) {
+      console.warn('[SipJsAdapter] SIP registration failed (non-critical for ARI-based calls):', err);
+      // Registration is optional - calls can still be made via backend API
+    }
   }
 
   async connect(target: string): Promise<void> {

@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     image: psynq-asterisk
     container_name: psynq-asterisk
+    network_mode: host  # CRITICAL: Host networking required for SIP/UDP to work on Windows Docker
     env_file:
       - ../../packages/backend/.env
     environment:
@@ -18,23 +19,15 @@ services:
       - DB_DATABASE=${DB_DATABASE}
       - ARI_USER=${ARI_USER}
       - ARI_PASSWORD=${ARI_PASSWORD}
-    ports:
-      # SIP ports
-      - '5060:5060/udp'   # SIP UDP
-      - '5061:5061/tcp'   # SIP TCP
-      - '5062:5062/tcp'   # SIP TLS
-      # ARI/HTTP ports
-      - '8088:8088/tcp'   # ARI HTTP
-      - '8089:8089/tcp'   # WebRTC WSS
-      # RTP ports
-      - '10000-10100:10000-10100/udp'  # RTP media range
+    # Ports NOT mapped with host networking - container uses host network directly
+    # SIP ports: 5060/udp, 5061/tcp, 5062/tcp
+    # ARI ports: 8088/tcp, 8089/tcp
+    # RTP ports: 10000-10100/udp
     volumes:
       - ./asterisk-config:/etc/asterisk:rw
       - asterisk-var:/var/lib/asterisk
       - asterisk-spool:/var/spool/asterisk
       - asterisk-log:/var/log/asterisk
-    networks:
-      - psynq-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "asterisk -rx 'core show version' || exit 1"]
@@ -50,22 +43,22 @@ volumes:
   asterisk-log:
     driver: local
 
-networks:
-  psynq-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
+# Note: Custom network removed - using host networking instead
 
 # Notes:
-# - This compose file is configured for local development with Docker networking
-# - RTP ports (10000-10100) are exposed for media streams
+# - CRITICAL: Uses host networking to bypass Docker Desktop Windows UDP/SIP bug
+#   Without host networking, Docker Desktop on Windows CANNOT send UDP packets
+#   to external servers (known Docker bug with NAT/UDP). Host networking is
+#   REQUIRED for SIP trunking to work.
+#   Reference: https://stackoverflow.com/questions/54792402/
+# - Host networking means container shares host's network stack
+# - Ports are NOT mapped - container binds directly to host ports
+# - To use: Enable "host networking" in Docker Desktop Settings → Resources → Network
+# - RTP ports (10000-10100) work directly on host network
 # - Volumes ensure persistent storage for recordings and logs
 # - Healthcheck ensures Asterisk is running properly
-# - Custom network allows inter-container communication
 # - For production, consider:
-#   - Not exposing SIP ports publicly
+#   - Not exposing SIP ports publicly (use firewall rules)
 #   - Using Session Border Controller (SBC)
-#   - Implementing proper firewall rules
 #   - Using certificates from a trusted CA
 #   - Configuring proper log rotation

@@ -111,15 +111,16 @@ export const useCallStore = create<CallStore>((set, get) => ({
   },
 
   createCall: async (from: string, to: string, authToken: string) => {
-    const { apiAdapter, audioAdapter } = useAdapterStore.getState();
-    if (!apiAdapter || !audioAdapter) return;
+    const { apiAdapter } = useAdapterStore.getState();
+    if (!apiAdapter) return;
 
     set({ isLoading: true });
     try {
       const { user } = useAuthStore.getState();
       const agentId = user?.id || 'sysadmin';
       const newCall = await apiAdapter.createCall(from, to, authToken, agentId);
-      await audioAdapter.connect(to);
+      // NOTE: Do NOT call audioAdapter.connect() for outbound calls
+      // Backend handles call origination via ARI, browser will receive call as incoming
       set({ currentCall: newCall, isLoading: false });
     } catch (error) {
       set({ error: 'Failed to create call', isLoading: false });

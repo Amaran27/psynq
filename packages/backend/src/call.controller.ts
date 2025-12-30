@@ -14,7 +14,7 @@ export class CallController {
    */
   @Post()
   async createCall(@Body() createCallDto: CreateCallDto, @Req() req): Promise<CallResponseDto> {
-    const agentId = req.user?.id || createCallDto.agentId;
+    const agentId = req.user?.userId || req.user?.id || createCallDto.agentId;
     return await this.callService.createCall(createCallDto, agentId);
   }
 

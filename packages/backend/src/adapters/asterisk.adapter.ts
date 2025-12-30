@@ -46,14 +46,30 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
     }
 
     try {
-      const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config', true);
-      if (!config) {
-        throw new ConfigurationMissingError('telephony.asterisk.config', orgId);
+      // Try to get tenant-specific config from database, fall back to app config
+      let ariUrl, ariUser, ariPass, ariApp;
+      
+      try {
+        const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config', true);
+        if (config) {
+          ariUrl = config.url;
+          ariUser = config.username;
+          ariPass = config.password;
+          ariApp = config.app;
+        }
+      } catch (err) {
+        // Settings service might not be available or configured
+        this.logger.debug(`Settings service lookup failed for ${key}: ${err.message}`);
       }
 
-      const ariUrl = config.url || this.appConfigService.asteriskConfig.url;
-      const ariUser = config.username || this.appConfigService.asteriskConfig.username;
-      const ariPass = config.password || this.appConfigService.asteriskConfig.password;
+      // Fall back to environment variables / app config
+      const appConfig = this.appConfigService.asteriskConfig;
+      ariUrl = ariUrl || appConfig.url;
+      ariUser = ariUser || appConfig.username;
+      ariPass = ariPass || appConfig.password;
+      ariApp = ariApp || appConfig.app;
+      
+      this.logger.log(`Connecting to Asterisk ARI at ${ariUrl} for ${key}`);
       
       const client = await ari.connect(ariUrl, ariUser, ariPass);
       
@@ -87,9 +103,9 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
           }
       });
 
-      client.start(config.app || this.appConfigService.asteriskConfig.app);
+      client.start(ariApp || this.appConfigService.asteriskConfig.app);
       this.clients.set(key, client);
-      this.logger.log(`Connected to Asterisk ARI for org: ${key}`);
+      this.logger.log(`✅ Connected to Asterisk ARI for org: ${key}`);
       return client;
     } catch (e) {
       this.logger.error(`Failed to connect to Asterisk for org ${orgId || 'system'}: ${e.message}`);
@@ -104,45 +120,49 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
 
     // Generate a random password for the SIP credential
     const crypto = await import('crypto');
-    const sipPassword = crypto.randomBytes(12).toString('hex');
+    // Use fixed password in development for testing (matches pjsip.conf static config)
+    const sipPassword = this.appConfigService.nodeEnv !== 'production' 
+      ? '35247bf8de7c7bd08bab1162' 
+      : crypto.randomBytes(12).toString('hex');
 
     // Attempt to provision the credential and endpoint in Asterisk realtime DB so the
     // browser can register via WebSocket (SIP over WS). Use AppDataSource to upsert rows.
     try {
       const AppDataSource = (await import('../data-source')).default;
-      await AppDataSource.initialize();
+      if (!AppDataSource.isInitialized) {
+        await AppDataSource.initialize();
+      }
       const qr = AppDataSource.createQueryRunner();
       await qr.connect();
 
-      // Upsert auth (ps_auths_data)
+      // Upsert auth (ps_auths)
       await qr.query(
-        `INSERT INTO ps_auths_data (id, auth_type, username, password)
+        `INSERT INTO ps_auths (id, auth_type, username, password)
          VALUES ($1, 'userpass', $2, $3)
          ON CONFLICT (id) DO UPDATE SET username = $2, password = $3`,
         [sipUsername, sipUsername, sipPassword]
       );
 
-      // Upsert AOR (ps_aors_data) - minimal contact placeholder
+      // Upsert AOR (ps_aors) - minimal contact placeholder
       await qr.query(
-        `INSERT INTO ps_aors_data (id, contact, qualify_frequency)
-         VALUES ($1, $2, 30)
-         ON CONFLICT (id) DO UPDATE SET contact = $2`,
+        `INSERT INTO ps_aors (id, contact, qualify_frequency, max_contacts)
+         VALUES ($1, $2, 30, 5)
+         ON CONFLICT (id) DO UPDATE SET contact = $2, max_contacts = 5`,
         [sipUsername, `sip:${sipUsername}@127.0.0.1`]
       );
 
-      // Upsert endpoint (ps_endpoints_data)
+      // Upsert endpoint (ps_endpoints)
       await qr.query(
-        `INSERT INTO ps_endpoints_data (
-            id, transport, aors, context, disallow, allow, rewrite_contact, force_rport, rtp_symmetric
+        `INSERT INTO ps_endpoints (
+            id, transport, aors, context, disallow, allow, rewrite_contact, force_rport, rtp_symmetric, auth
          ) VALUES (
-            $1, $2, $3, $4, 'all', 'ulaw', 'yes', 'yes', 'yes'
+            $1, $2, $3, $4, 'all', 'ulaw', 'yes', 'yes', 'yes', $5
          )
-         ON CONFLICT (id) DO UPDATE SET aors = $3`,
-        [sipUsername, this.appConfigService.asteriskConfig.transport, sipUsername, this.appConfigService.asteriskConfig.context]
+         ON CONFLICT (id) DO UPDATE SET aors = $3, auth = $5`,
+        [sipUsername, this.appConfigService.asteriskConfig.transport, sipUsername, this.appConfigService.asteriskConfig.context, sipUsername]
       );
 
       await qr.release();
-      await AppDataSource.destroy();
     } catch (err) {
       this.logger.warn(`Failed to provision SIP credential for ${sipUsername}: ${err?.message || err}`);
       // proceed - return token anyway (UI will get auth failure and we can debug further)
@@ -156,9 +176,9 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
       password: sipPassword,
     };
 
-    // In development, force the server to point to local Asterisk WS to avoid mismatched WSS defaults
+    // In development, force the server to point to local Asterisk WS for browser access
     if (this.appConfigService.nodeEnv !== 'production') {
-      token.server = process.env.ASTERISK_WEBRTC_URI || 'ws://127.0.0.1:8088/ws';
+      token.server = 'ws://127.0.0.1:8088/ws';
     }
 
     this.logger.log(`Generated telephony token for ${sipUsername}: ${JSON.stringify({ server: token.server, sip_uri: token.sip_uri })}`);
@@ -290,17 +310,27 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
       const bridgeId = `bridge-${call.id}`;
       await client.bridges.create({ type: 'mixing', bridgeId });
 
-      const agentEndpoint = `PJSIP/${call.agentId}`;
-      this.logger.log(`Originating call to agent: ${agentEndpoint}`);
+      // Use 'from' field as SIP username (should match the Asterisk endpoint name)
+      const sipUsername = call.from;
+      
+      // IMPORTANT: Use Local channel to outbound-routing context (bypass ASTERISK-30042)
+      // Since WebSocket endpoints can't register properly in Asterisk 16, we can't ring the agent
+      // Instead, we originate the outbound call directly via the dialplan
+      // The agent will be bridged in later via ARI events when they answer
+      const destination = call.to;
+      const outboundEndpoint = `Local/${destination}@outbound-routing`;
+      this.logger.log(`Originating outbound call via Local channel: ${outboundEndpoint}`);
       
       const channel = await client.channels.originate({
-        endpoint: agentEndpoint,
+        endpoint: outboundEndpoint,
         app: config?.app || this.appConfigService.asteriskConfig.app,
+        callerId: config?.callerId || '+12706481767', // Use Twilio verified caller ID
         variables: { 
           CALL_ID: call.id, 
           BRIDGE_ID: bridgeId, 
           ROLE: 'agent',
-          DESTINATION: call.to
+          DESTINATION: destination,
+          AGENT_USERNAME: sipUsername
         }
       });
 
@@ -314,7 +344,12 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
 
   async dialLegB(orgId: string | null, callId: string, bridgeId: string, destination: string): Promise<void> {
     const client = await this.getClient(orgId);
-    const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+    let config;
+    try {
+      config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+    } catch (e) {
+      // Use defaults
+    }
     const trunkId = config?.trunkId || this.appConfigService.twilioConfig.trunkId;
     await client.channels.originate({
       endpoint: `PJSIP/${destination}@${trunkId}`,
@@ -383,7 +418,13 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
 
       await bridge.addChannel({ channel: callId });
 
-      const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+      let config;
+      try {
+        config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+      } catch (e) {
+        // Use defaults
+      }
+      
       const targetChannel = await client.channels.originate({
           endpoint: `PJSIP/${targetIdentifier}`,
           app: config?.app || this.appConfigService.asteriskConfig.app,
@@ -432,7 +473,13 @@ export class AsteriskAdapter implements TelephonyPort, OnModuleInit, OnModuleDes
                     appArgs: 'snooping'
                 });
                 
-                const config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+                let config;
+                try {
+                  config = await this.settingsService.getSetting(orgId, 'telephony.asterisk.config');
+                } catch (e) {
+                  // Use defaults
+                }
+                
                 const supervisorChannel = await client.channels.originate({
                     endpoint: `PJSIP/${supervisorId}`,
                     app: config?.app || this.appConfigService.asteriskConfig.app,
