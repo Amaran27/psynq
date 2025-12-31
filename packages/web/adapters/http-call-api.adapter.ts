@@ -35,7 +35,12 @@ export class HttpCallApiAdapter implements CallApiPort {
     return response.json();
   }
 
-  async login(username: string, password: string): Promise<{ access_token: string }> {
+  async login(username: string, password: string): Promise<{ 
+    access_token: string; 
+    refresh_token: string; 
+    expires_in: number; 
+    token_type: string;
+  }> {
     const response = await fetch(`${this.baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -47,6 +52,21 @@ export class HttpCallApiAdapter implements CallApiPort {
 
   decodeToken(token: string): any {
     return jwtDecode(token);
+  }
+
+  async refreshToken(refreshToken: string): Promise<{ 
+    access_token: string; 
+    refresh_token: string; 
+    expires_in: number; 
+    token_type: string;
+  }> {
+    const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    return this.handleResponse(response);
   }
 
   async updateAgentStatus(token: string, status: AgentStatus): Promise<void> {

@@ -18,6 +18,7 @@ export const SettingsContainer: React.FC = () => {
   } = useSettingsStore();
 
   const [activeTab, setActiveTab] = useState<'general' | 'telephony' | 'storage' | 'tenants'>('general');
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
     initializeAdapter();
@@ -29,12 +30,19 @@ export const SettingsContainer: React.FC = () => {
     }
   }, [settingsAdapter, setApiAdapter]);
 
+  // Wait for auth store to hydrate from localStorage
+  useEffect(() => {
+    const timer = setTimeout(() => setIsHydrated(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     if (isLoggedIn && user?.roles.includes('system_admin')) {
       loadTenants();
     }
   }, [isLoggedIn, user, loadTenants]);
 
+  if (!isHydrated) return <div className="p-10 text-slate-600">Loading...</div>;
   if (!isLoggedIn) return <div className="p-10 text-slate-600">Please login to access settings.</div>;
   
   const isAdmin = user?.roles.includes('admin') || user?.roles.includes('system_admin');
@@ -166,13 +174,31 @@ const AsteriskConfig = () => {
 };
 
 const StorageSettings = () => {
-    const { settings, loadSetting, updateSetting, isLoading } = useSettingsStore();
+    const { settings, loadSetting, updateSetting, updateStorageConfig, testStorage, isLoading } = useSettingsStore();
     const [provider, setProvider] = useState('');
+    const [healthStatus, setHealthStatus] = useState<{ healthy?: boolean; message?: string } | null>(null);
+    const [isTesting, setIsTesting] = useState(false);
 
     useEffect(() => { loadSetting('storage.provider'); }, [loadSetting]);
     useEffect(() => { if (settings['storage.provider']) setProvider(settings['storage.provider'].value); }, [settings]);
 
-    const handleSave = async () => { await updateSetting('storage.provider', provider, false); };
+    const handleSave = async () => { 
+        await updateSetting('storage.provider', provider, false);
+        setHealthStatus(null);
+    };
+
+    const handleTestConnection = async () => {
+        setIsTesting(true);
+        setHealthStatus(null);
+        try {
+            const result = await testStorage();
+            setHealthStatus({ healthy: result.healthy, message: result.message });
+        } catch (error: any) {
+            setHealthStatus({ healthy: false, message: error.message || 'Connection test failed' });
+        } finally {
+            setIsTesting(false);
+        }
+    };
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -180,11 +206,23 @@ const StorageSettings = () => {
             <p className="text-slate-500 mb-8 font-medium text-lg">Direct the storage of call recordings and media assets.</p>
             
             <div className="bg-white p-10 rounded-2xl shadow-sm border border-slate-200">
+                {healthStatus && (
+                    <div className={`mb-6 p-4 rounded-xl flex items-center space-x-3 ${healthStatus.healthy ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                        <span className="text-2xl">{healthStatus.healthy ? '✅' : '❌'}</span>
+                        <div>
+                            <p className={`font-bold ${healthStatus.healthy ? 'text-green-900' : 'text-red-900'}`}>
+                                {healthStatus.healthy ? 'Connection Successful' : 'Connection Failed'}
+                            </p>
+                            <p className={`text-sm ${healthStatus.healthy ? 'text-green-700' : 'text-red-700'}`}>{healthStatus.message}</p>
+                        </div>
+                    </div>
+                )}
+
                 <div className="mb-10">
                     <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-3">Active Storage Engine</label>
                     <select 
                         value={provider} 
-                        onChange={(e) => setProvider(e.target.value)}
+                        onChange={(e) => { setProvider(e.target.value); setHealthStatus(null); }}
                         className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl font-bold focus:border-blue-500 focus:ring-0 outline-none transition-all"
                     >
                         <option value="local">📁 Local Filesystem (Developer Mode)</option>
@@ -196,27 +234,44 @@ const StorageSettings = () => {
                 {provider === 's3' && <S3Config />}
                 {provider === 'minio' && <MinioConfig />}
 
-                <button 
-                    onClick={handleSave} 
-                    disabled={isLoading}
-                    className="mt-10 w-full bg-slate-900 text-white py-4 rounded-xl font-black text-lg hover:bg-slate-800 transition shadow-xl"
-                >
-                    {isLoading ? 'Applying...' : 'Update Storage Engine'}
-                </button>
+                <div className="mt-10 flex space-x-4">
+                    <button 
+                        onClick={handleSave} 
+                        disabled={isLoading}
+                        className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-black text-lg hover:bg-slate-800 transition shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? 'Applying...' : 'Update Storage Engine'}
+                    </button>
+                    <button
+                        onClick={handleTestConnection}
+                        disabled={isTesting || !provider || provider === 'local'}
+                        className="px-8 bg-blue-600 text-white py-4 rounded-xl font-black text-lg hover:bg-blue-700 transition shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isTesting ? 'Testing...' : 'Test Connection'}
+                    </button>
+                </div>
             </div>
         </div>
     );
 };
 
 const S3Config = () => {
-    const { settings, loadSetting, updateSetting } = useSettingsStore();
+    const { settings, loadSetting, updateStorageConfig, isLoading } = useSettingsStore();
     const [config, setConfig] = useState({ accessKeyId: '', secretAccessKey: '', region: '', bucket: '' });
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => { loadSetting('storage.s3.config'); }, [loadSetting]);
     useEffect(() => { if (settings['storage.s3.config']) setConfig(settings['storage.s3.config'].value || {}); }, [settings]);
 
     const handleChange = (e: any) => setConfig({ ...config, [e.target.name]: e.target.value });
-    const handleSave = () => updateSetting('storage.s3.config', config, true);
+    const handleSave = async () => { 
+        setIsSaving(true);
+        try {
+            await updateStorageConfig('s3', config);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     return (
         <div className="space-y-6 border-t border-slate-100 pt-10 mt-6 text-slate-800">
@@ -227,20 +282,34 @@ const S3Config = () => {
                 <ConfigInput label="Region" name="region" value={config.region} onChange={handleChange} placeholder="us-east-1" />
                 <ConfigInput label="Bucket Name" name="bucket" value={config.bucket} onChange={handleChange} />
             </div>
-            <button onClick={handleSave} className="text-sm font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest">Save S3 Keys</button>
+            <button 
+                onClick={handleSave} 
+                disabled={isSaving || isLoading}
+                className="text-sm font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {isSaving ? 'Saving...' : 'Save S3 Keys'}
+            </button>
         </div>
     );
 };
 
 const MinioConfig = () => {
-    const { settings, loadSetting, updateSetting } = useSettingsStore();
+    const { settings, loadSetting, updateStorageConfig, isLoading } = useSettingsStore();
     const [config, setConfig] = useState({ endpoint: '', accessKey: '', secretKey: '', bucket: '', port: '9000', useSSL: false });
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => { loadSetting('storage.minio.config'); }, [loadSetting]);
     useEffect(() => { if (settings['storage.minio.config']) setConfig(settings['storage.minio.config'].value || {}); }, [settings]);
 
     const handleChange = (e: any) => setConfig({ ...config, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
-    const handleSave = () => updateSetting('storage.minio.config', config, true);
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await updateStorageConfig('minio', config);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     return (
         <div className="space-y-6 border-t border-slate-100 pt-10 mt-6 text-slate-800">
@@ -256,7 +325,13 @@ const MinioConfig = () => {
                     <label className="font-bold text-slate-700">Force Secure SSL</label>
                 </div>
             </div>
-            <button onClick={handleSave} className="text-sm font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest">Update Cluster Auth</button>
+            <button 
+                onClick={handleSave}
+                disabled={isSaving || isLoading}
+                className="text-sm font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                {isSaving ? 'Saving...' : 'Update Cluster Auth'}
+            </button>
         </div>
     );
 };

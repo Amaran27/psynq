@@ -46,6 +46,9 @@ export function CallCenterContainer() {
 
   const { initializeAdapter, apiAdapter, initializeAudioAdapterOnDemand } = useAdapterStore();
 
+  // Check if we have a stored token before first render (prevents login flash)
+  const hasStoredToken = typeof window !== 'undefined' ? !!localStorage.getItem('jwt_token') : false;
+
   // Initialize API adapter
   useEffect(() => {
     initializeAdapter();
@@ -89,16 +92,12 @@ export function CallCenterContainer() {
         // For inbound calls, initialize SIP.js on-demand before adding the call
         // IMPORTANT: Only initialize SIP.js for TRUE inbound calls (from PSTN)
         // Outbound calls via ARI also start in RINGING state, so we must check direction
-        console.log('[CallCenterContainer] 📞 New call received:', { direction: newCall.direction, state: newCall.state });
         if (newCall.direction === 'inbound' && newCall.state === CallState.RINGING) {
-          console.log('%c[CallCenterContainer] 📞 Inbound call detected, initializing SIP.js...', 'color: #2196F3');
           try {
             await initializeAudioAdapterOnDemand();
           } catch (err) {
             console.error('[CallCenterContainer] Failed to initialize SIP.js for inbound call:', err);
           }
-        } else {
-          console.log('[CallCenterContainer] 📞 Call is NOT inbound+ringing, skipping SIP.js initialization');
         }
         addCall(newCall);
       }, token);
@@ -191,8 +190,17 @@ export function CallCenterContainer() {
     }
   };
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn && !hasStoredToken) {
     return <LoginScreen onLogin={handleLogin} isLoading={authLoading} error={authError} />;
+  }
+
+  // Show loading state while hydrating auth from localStorage
+  if (!isLoggedIn && hasStoredToken) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-white text-xl">
+        Loading...
+      </div>
+    );
   }
 
   return (

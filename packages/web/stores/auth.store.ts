@@ -7,6 +7,8 @@ interface AuthState {
   isLoggedIn: boolean;
   user: { id: string; username: string; roles: string[]; organizationId?: string } | null;
   token: string | null;
+  refreshToken: string | null;
+  tokenExpiresAt: number | null;
   status: AgentStatus; // Agent status
   isLoading: boolean;
   error: string | null;
@@ -20,6 +22,8 @@ interface AuthActions {
   updateAgentStatus: (status: AgentStatus) => Promise<void>;
   fetchAgentStatus: () => Promise<void>;
   isAuthenticated: () => boolean;
+  refreshToken: () => Promise<void>;
+  shouldRefreshToken: () => boolean;
 }
 
 let apiAdapter: CallApiPort | null = null;
@@ -29,6 +33,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isLoggedIn: false,
   user: null,
   token: null,
+  refreshToken: null,
+  tokenExpiresAt: null,
   status: AgentStatus.OFFLINE, // Default status
   isLoading: false,
   error: null,
@@ -43,6 +49,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   loadInitialAuth: () => {
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('jwt_token');
+      const refreshToken = localStorage.getItem('refresh_token');
       const user = localStorage.getItem('user_data');
       if (token && user) {
         // Verify token expiration locally before trusting it
@@ -62,6 +69,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         set({
           isLoggedIn: true,
           token: token,
+          refreshToken: refreshToken,
+          tokenExpiresAt: token ? (apiAdapter?.decodeToken(token)?.exp || null) * 1000 : null,
           user: JSON.parse(user),
         });
         // Also fetch agent status when re-loading session
@@ -92,6 +101,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('jwt_token', response.access_token);
+        localStorage.setItem('refresh_token', response.refresh_token);
         localStorage.setItem('user_data', JSON.stringify(user));
       }
 
@@ -99,6 +109,8 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
         isLoggedIn: true,
         user,
         token: response.access_token,
+        refreshToken: response.refresh_token,
+        tokenExpiresAt: decodedToken.exp * 1000,
         isLoading: false,
       });
       // Fetch agent status immediately after login
@@ -115,9 +127,17 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   logout: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('jwt_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user_data');
     }
-    set({ isLoggedIn: false, user: null, token: null, status: AgentStatus.OFFLINE });
+    set({ 
+      isLoggedIn: false, 
+      user: null, 
+      token: null, 
+      refreshToken: null,
+      tokenExpiresAt: null,
+      status: AgentStatus.OFFLINE 
+    });
   },
 
   updateAgentStatus: async (newStatus: AgentStatus) => {
@@ -161,7 +181,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
   isAuthenticated: () => {
     const { token } = get();
     if (!token || !apiAdapter) return false;
-    
+
     try {
       const decoded = apiAdapter.decodeToken(token);
       const now = Date.now() / 1000;
@@ -173,6 +193,55 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     } catch (err) {
       console.error('Error checking authentication:', err);
       return false;
+    }
+  },
+
+  shouldRefreshToken: () => {
+    const { tokenExpiresAt } = get();
+    if (!tokenExpiresAt) return false;
+    
+    // Refresh if token expires in less than 5 minutes
+    const now = Date.now();
+    const timeUntilExpiry = tokenExpiresAt - now;
+    return timeUntilExpiry < 5 * 60 * 1000; // 5 minutes in milliseconds
+  },
+
+  refreshToken: async () => {
+    const { refreshToken: currentRefreshToken } = get();
+    if (!currentRefreshToken || !apiAdapter) {
+      throw new Error('No refresh token available');
+    }
+
+    try {
+      const response = await fetch('http://localhost:3001/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: currentRefreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      const data = await response.json();
+      const decodedToken: any = apiAdapter.decodeToken(data.access_token);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('jwt_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+      }
+
+      set({
+        token: data.access_token,
+        refreshToken: data.refresh_token,
+        tokenExpiresAt: decodedToken.exp * 1000,
+      });
+
+      return data.access_token;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      get().logout();
+      throw error;
     }
   },
 }));

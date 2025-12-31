@@ -12,6 +12,29 @@ export interface Setting {
   isSecret: boolean;
 }
 
+export interface StorageConfig {
+  current: string;
+  available: string[];
+  configs: {
+    minio?: any;
+    s3?: any;
+    local?: any;
+  };
+}
+
+export interface TelephonyConfig {
+  asterisk?: any;
+  twilio?: any;
+  trunk?: string;
+}
+
+export interface RecordingConfig {
+  enabled: boolean;
+  autoDeleteDays: number;
+  format: string;
+  path: string;
+}
+
 export interface SettingsApiPort {
   // Tenant Management (System Admin only)
   createTenant(name: string, slug: string, token: string): Promise<Organization>;
@@ -24,4 +47,23 @@ export interface SettingsApiPort {
   
   // System Settings (System Admin only)
   getSystemSetting(key: string, token: string): Promise<Setting>;
+  getAllSystemSettings(token: string): Promise<Record<string, Setting>>;
+
+  // Storage Configuration
+  getStorageConfig(token: string): Promise<StorageConfig>;
+  updateStorageConfig(provider: string, config: any, token: string): Promise<void>;
+  testStorage(token: string): Promise<{ healthy: boolean; provider: string; message: string }>;
+
+  // Telephony Configuration
+  getTelephonyConfig(token: string): Promise<TelephonyConfig>;
+  updateTelephonyConfig(trunk: string, config: any, token: string): Promise<void>;
+
+  // Recording Configuration
+  getRecordingConfig(token: string): Promise<RecordingConfig>;
+  updateRecordingConfig(config: {
+    enabled?: boolean;
+    autoDeleteDays?: number;
+    format?: string;
+    path?: string;
+  }, token: string): Promise<void>;
 }

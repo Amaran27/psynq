@@ -2,7 +2,18 @@ import { Call, AgentStatus } from '@psynq/core';
 
 export interface CallApiPort {
   // Authentication
-  login(username: string, password: string): Promise<{ access_token: string }>;
+  login(username: string, password: string): Promise<{ 
+    access_token: string; 
+    refresh_token: string; 
+    expires_in: number; 
+    token_type: string;
+  }>;
+  refreshToken(refreshToken: string): Promise<{ 
+    access_token: string; 
+    refresh_token: string; 
+    expires_in: number; 
+    token_type: string;
+  }>;
   decodeToken(token: string): any;
 
   // Agent Status
