@@ -118,6 +118,19 @@ export class SettingsService {
     await this.cacheManager.del(cacheKey);
   }
 
+  async getAllSettings(orgId: string | null, includeSecrets = false): Promise<any[]> {
+    const settings = await this.settingsRepository.find({
+      where: { organizationId: orgId === null ? IsNull() : orgId },
+    });
+
+    return settings.map(setting => ({
+      key: setting.key,
+      value: this.processSettingValue({ value: setting.value, isSecret: setting.isSecret }, includeSecrets),
+      isSecret: setting.isSecret,
+      updatedAt: setting.updatedAt,
+    }));
+  }
+
   private processSettingValue(data: any, includeSecrets: boolean): any {
     if (data.isSecret && !includeSecrets) {
       return '********';

@@ -61,9 +61,9 @@ export class AuthService {
   }
 
   /**
-   * Logs in a user and returns a JWT.
+   * Logs in a user and returns JWT access and refresh tokens.
    * @param user - The user object (typically from validateUser).
-   * @returns An object containing the access token.
+   * @returns An object containing the access token and refresh token.
    */
   async login(user: Omit<UserEntity, 'password'>) {
     const payload = { 
@@ -72,9 +72,58 @@ export class AuthService {
       roles: user.roles,
       orgId: user.organizationId 
     };
+
+    // Access token - short-lived (1 day)
+    const access_token = this.jwtService.sign(payload);
+
+    // Refresh token - long-lived (7 days)
+    const refresh_token = this.jwtService.sign(payload, {
+      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    } as any); // Type assertion for expiresIn option
+
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token,
+      refresh_token,
+      expires_in: 86400, // 24 hours in seconds
+      token_type: 'Bearer',
     };
+  }
+
+  /**
+   * Refresh access token using refresh token
+   * @param refreshToken - The refresh token
+   * @returns New access token
+   */
+  async refreshTokens(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken);
+      const user = await this.userRepository.findOneBy({ id: payload.sub });
+      
+      if (!user) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      const newPayload = {
+        username: user.username,
+        sub: user.id,
+        roles: user.roles,
+        orgId: user.organizationId,
+      };
+
+      const access_token = this.jwtService.sign(newPayload);
+      const newRefreshToken = this.jwtService.sign(newPayload, {
+        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+      } as any); // Type assertion for expiresIn option
+
+      return {
+        access_token,
+        refresh_token: newRefreshToken,
+        expires_in: 86400,
+        token_type: 'Bearer',
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
   }
 
   /**

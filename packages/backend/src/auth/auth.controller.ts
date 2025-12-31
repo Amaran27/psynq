@@ -37,4 +37,10 @@ export class AuthController {
     const userId = req.user.userId;
     return await this.authService.updateStatus(userId, updateStatusDto.status);
   }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() body: { refresh_token: string }) {
+    return this.authService.refreshTokens(body.refresh_token);
+  }
 }

@@ -20,6 +20,7 @@ import { TranscriptionModule } from './modules/transcription/transcription.modul
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { TenantInterceptor } from './auth/tenant.interceptor';
 import { SettingsController } from './settings.controller';
+import { SystemSettingsController } from './system-settings.controller';
 import { SettingsModule } from './modules/settings.module';
 import { OrganizationModule } from './modules/organization/organization.module';
 import { OrganizationEntity } from './entities/organization.entity';
@@ -28,6 +29,7 @@ import { FlowEntity } from './entities/flow.entity';
 import { WalletEntity } from './entities/wallet.entity';
 import { RateEntity } from './entities/rate.entity';
 import { ConfigModule as AppConfigModule } from './config/config.module';
+// import { RecordingsModule } from './recordings/recordings.module'; // Temporarily disabled - missing minio module
 
 @Module({
   imports: [
@@ -63,8 +65,9 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
     WebhookModule,
     SettingsModule,
     OrganizationModule,
+    // RecordingsModule, // Temporarily disabled - missing minio module
   ],
-  controllers: [AppController, SettingsController],
+  controllers: [AppController, SettingsController, SystemSettingsController],
   providers: [
     AppService,
     {

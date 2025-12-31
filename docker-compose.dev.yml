@@ -82,12 +82,19 @@ services:
       - DB_DATABASE=psynq_db
       - ARI_USER=psynq-app
       - ARI_PASSWORD=psynq-pass
+      # MinIO configuration for recording uploads
+      - MINIO_ENDPOINT=http://127.0.0.1:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=psynq-recordings
     volumes:
       # Mount custom Asterisk configurations (Twilio SIP trunk, dialplan, etc.)
       - ./deploy/asterisk/asterisk-config:/etc/asterisk:rw
       # Mount ODBC configuration files
       - ./deploy/asterisk/odbc-config/odbc.ini:/etc/odbc.ini:ro
       - ./deploy/asterisk/odbc-config/odbcinst.ini:/etc/odbcinst.ini:ro
+      # Mount recording upload script
+      - ./deploy/asterisk/scripts:/usr/local/bin:ro
       - asterisk_var:/var/lib/asterisk
       - asterisk_spool:/var/spool/asterisk
       - asterisk_log:/var/log/asterisk
@@ -142,6 +149,12 @@ services:
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=psynq-recordings
+      # JWT Configuration (from .env)
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-1d}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
+      # Storage Configuration (allows switching between providers)
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-minio}
     depends_on:
       postgres:
         condition: service_healthy
