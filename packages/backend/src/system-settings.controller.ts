@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, Inject, BadRequestException } from '@nestjs/common';
 import { RolesGuard } from './auth/roles.guard';
 import { Roles } from './auth/roles.decorator';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { SettingsService } from './services/settings.service';
 import { UserRole } from './entities/user.entity';
+import { StoragePort } from './ports/storage.port';
+import { UpdateStorageConfigDto, UpdateTelephonyConfigDto, UpdateRecordingConfigDto, UpdateSettingDto } from './dto/system-settings.dto';
 
 /**
  * System Settings Controller
@@ -16,7 +18,10 @@ import { UserRole } from './entities/user.entity';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/system-settings')
 export class SystemSettingsController {
-  constructor(private readonly settingsService: SettingsService) {}
+  constructor(
+    private readonly settingsService: SettingsService,
+    @Inject('StoragePort') private readonly storagePort: StoragePort,
+  ) {}
 
   /**
    * Get all system settings (admin only)
@@ -50,7 +55,7 @@ export class SystemSettingsController {
   @Put(':key')
   async updateSetting(
     @Param('key') key: string,
-    @Body() body: { value: any },
+    @Body() body: UpdateSettingDto,
   ) {
     await this.settingsService.setSetting(null, key, body.value);
     return {
@@ -86,23 +91,16 @@ export class SystemSettingsController {
    */
   @Roles(UserRole.SYSTEM_ADMIN)
   @Put('storage/config')
-  async updateStorageConfig(@Body() body: { provider: string; config: any }) {
+  async updateStorageConfig(@Body() body: UpdateStorageConfigDto) {
     const { provider, config } = body;
-    
-    // Validate provider
-    const validProviders = ['minio', 's3', 'local'];
-    if (!validProviders.includes(provider)) {
-      return {
-        success: false,
-        message: `Invalid storage provider. Must be one of: ${validProviders.join(', ')}`,
-      };
-    }
 
     // Update provider
     await this.settingsService.setSetting(null, 'storage.provider', provider);
     
-    // Update provider config
-    await this.settingsService.setSetting(null, `storage.${provider}.config`, config);
+    // Update provider config if provided
+    if (config) {
+      await this.settingsService.setSetting(null, `storage.${provider}.config`, config);
+    }
     
     return {
       success: true,
@@ -116,12 +114,27 @@ export class SystemSettingsController {
   @Roles(UserRole.SYSTEM_ADMIN)
   @Post('storage/test')
   async testStorage() {
-    // This would use the health check from storage adapter
-    // For now, return a placeholder
-    return {
-      success: true,
-      message: 'Storage connection test not yet implemented',
-    };
+    try {
+      const isHealthy = await this.storagePort.healthCheck(null);
+      const currentProvider = await this.settingsService.getSetting(null, 'storage.provider', true) || 'local';
+      
+      return {
+        success: true,
+        data: {
+          healthy: isHealthy,
+          provider: currentProvider,
+          message: isHealthy 
+            ? `Storage connection successful using ${currentProvider}` 
+            : `Storage connection failed for ${currentProvider}`,
+          timestamp: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException({
+        success: false,
+        message: `Storage test failed: ${error.message}`,
+      });
+    }
   }
 
   /**
@@ -144,14 +157,14 @@ export class SystemSettingsController {
    */
   @Roles(UserRole.SYSTEM_ADMIN)
   @Put('telephony/config')
-  async updateTelephonyConfig(@Body() body: { trunk?: string; config?: any }) {
+  async updateTelephonyConfig(@Body() body: UpdateTelephonyConfigDto) {
     const { trunk, config } = body;
     
     if (trunk) {
       await this.settingsService.setSetting(null, 'telephony.active_trunk', trunk);
     }
     
-    if (config) {
+    if (config && trunk) {
       // Update specific trunk configuration
       const trunkKey = `telephony.${trunk}.config`;
       await this.settingsService.setSetting(null, trunkKey, config);
@@ -184,12 +197,7 @@ export class SystemSettingsController {
    */
   @Roles(UserRole.SYSTEM_ADMIN)
   @Put('recording/config')
-  async updateRecordingConfig(@Body() body: {
-    enabled?: boolean;
-    autoDeleteDays?: number;
-    format?: string;
-    path?: string;
-  }) {
+  async updateRecordingConfig(@Body() body: UpdateRecordingConfigDto) {
     const { enabled, autoDeleteDays, format, path } = body;
     
     if (enabled !== undefined) {
