@@ -2647,7 +2647,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 2. API Key (Service Accounts)
 ```http
-X-API-Key: sk_live_550e8400e29b41d4a716446655440000
+X-API-Key: sk_live_YOUR_API_KEY_HERE
 ```
 
 **Key Format**: `sk_live_{32-char hex}` or `sk_test_{32-char hex}`
