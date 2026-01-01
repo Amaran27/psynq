@@ -1,0 +1,94 @@
+Subject,Type,Description,Parent,Priority,Estimated time,Assignee,Status,Start date,Finish date,Progress,Responsible,Accountable,Consulted,Informed,Acceptance Criteria,Definition of Ready,Definition of Done,AI Agent Instructions,Notes,Tags,Custom Field 1
+"Phase 3: Telephony Core & Asterisk Integration","Phase","Implement the core telephony engine using Asterisk and ARI.
+
+# High-Level Design (HLD)
+- Asterisk 18+ with PJSIP and ARI
+- Telephony Provider Interface (Adapter Pattern)
+- Asterisk ARI Adapter implementation
+- Call State Machine (FSM)
+- SIP Trunking configuration
+- Media handling (Recordings, Playback)
+- Event mapping (Asterisk events to Domain events)
+
+# Architecture Decisions
+- Never call Asterisk directly from business logic
+- Use the TelephonyProvider interface for all actions
+- Implement a robust FSM for call state management
+- Use ARI for real-time call control
+- Abstract SIP details from the core domain
+
+# Deliverables
+- packages/backend/src/ports/telephony-provider.port.ts
+- packages/backend/src/adapters/telephony/asterisk-ari.adapter.ts
+- packages/backend/src/domain/models/call-state.fsm.ts
+- deploy/asterisk/config/pjsip.conf
+- deploy/asterisk/config/ari.conf
+- Telephony event handlers","","High","300h","","New","","","0%","","","","","","","","","telephony,phase3","",""
+"Epic: Asterisk ARI Integration","Epic","Implement the ARI client and adapter for Asterisk control.","Phase 3: Telephony Core & Asterisk Integration","High","60h","","New","","","0%","","","","","","","","","asterisk,ari","",""
+"Feature: Telephony Provider Interface","Feature","Define the generic interface for telephony operations.","Epic: Asterisk ARI Integration","High","16h","","New","","","0%","","","","","","","","","telephony,interface","",""
+"Task: Define TelephonyProvider interface","Task","Create the TelephonyProvider interface in the ports directory.
+
+# Low-Level Design (LLD)
+## File Path
+`packages/backend/src/ports/telephony-provider.port.ts`
+
+## Interface Methods
+- `makeCall(from: string, to: string): Promise<string>`
+- `hangupCall(callId: string): Promise<void>`
+- `answerCall(callId: string): Promise<void>`
+- `holdCall(callId: string): Promise<void>`
+- `resumeCall(callId: string): Promise<void>`
+- `playMedia(callId: string, mediaUrl: string): Promise<void>`
+
+# Definition of Done (DOD)
+- [ ] Interface defined with all core methods
+- [ ] TypeScript types for Call and Event defined
+- [ ] Documentation comments for each method","Feature: Telephony Provider Interface","Normal","6h","","New","","","0%","","","","","Interface covers all core actions","Requirements for call control defined","Create interface file","NO MOCKS: Use real TS interfaces.","","telephony,port",""
+"Feature: Asterisk ARI Adapter","Feature","Implement the Asterisk ARI adapter using the `ari-client` library.","Epic: Asterisk ARI Integration","High","30h","","New","","","0%","","","","","","","","","asterisk,adapter","",""
+"Task: Implement AsteriskAriAdapter","Task","Create the implementation of TelephonyProvider for Asterisk.
+
+# Low-Level Design (LLD)
+## File Path
+`packages/backend/src/adapters/telephony/asterisk-ari.adapter.ts`
+
+## Logic
+- Connect to ARI via WebSocket
+- Map ARI events (StasisStart, StasisEnd) to Domain events
+- Use ARI REST API for actions (channels.originate, channels.hangup)
+
+# Definition of Done (DOD)
+- [ ] Adapter connects to Asterisk
+- [ ] `makeCall` successfully originates a call
+- [ ] `hangupCall` successfully ends a call","Feature: Asterisk ARI Adapter","Normal","12h","","New","","","0%","","","","","Adapter controls Asterisk via ARI","ARI credentials and URL ready","Implement adapter class","NO MOCKS: Use real ari-client library.","","asterisk,ari,adapter",""
+"Epic: Call State Machine (FSM)","Epic","Implement a robust Finite State Machine for call lifecycle management.","Phase 3: Telephony Core & Asterisk Integration","High","50h","","New","","","0%","","","","","","","","","fsm,call-state","",""
+"Feature: Call FSM Implementation","Feature","Develop the FSM logic for managing call states.","Epic: Call State Machine (FSM)","High","20h","","New","","","0%","","","","","","","","","fsm,logic","",""
+"Task: Create CallStateMachine class","Task","Implement the FSM in the domain layer.
+
+# Low-Level Design (LLD)
+## States
+- IDLE, RINGING, ANSWERED, ON_HOLD, ENDED
+
+## Transitions
+- `start()`: IDLE -> RINGING
+- `answer()`: RINGING -> ANSWERED
+- `hold()`: ANSWERED -> ON_HOLD
+- `end()`: ANY -> ENDED
+
+# Definition of Done (DOD)
+- [ ] FSM class implemented in pure TypeScript
+- [ ] Guard conditions for invalid transitions
+- [ ] Unit tests for all state transitions","Feature: Call FSM Implementation","Normal","8h","","New","","","0%","","","","","FSM handles all states correctly","State transition diagram ready","Implement FSM class","NO MOCKS: Use pure TS logic.","","fsm,domain",""
+"Epic: SIP Trunking & PJSIP","Epic","Configure Asterisk PJSIP for external SIP trunking and internal extensions.","Phase 3: Telephony Core & Asterisk Integration","High","50h","","New","","","0%","","","","","","","","","sip,pjsip","",""
+"Feature: PJSIP Configuration","Feature","Create the PJSIP configuration files for Asterisk.","Epic: SIP Trunking & PJSIP","High","20h","","New","","","0%","","","","","","","","","pjsip,config","",""
+"Task: Create deploy/asterisk/config/pjsip.conf","Task","Configure endpoints, AORs, and auth for PJSIP.
+
+# Low-Level Design (LLD)
+## Sections
+- `transport-udp`: UDP transport on 5060
+- `endpoint-template`: Common settings for extensions
+- `trunk-twilio`: Configuration for external SIP trunk
+
+# Definition of Done (DOD)
+- [ ] pjsip.conf created
+- [ ] Internal extensions can register
+- [ ] Outbound calls via trunk work","Feature: PJSIP Configuration","Normal","8h","","New","","","0%","","","","","SIP registration and calling works","SIP credentials ready","Create config file","NO MOCKS: Use real PJSIP parameters.","","pjsip,config,file",""

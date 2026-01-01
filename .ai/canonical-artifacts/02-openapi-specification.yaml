@@ -1,0 +1,2723 @@
+# Canonical OpenAPI 3.0 Specification - Psynq CPaaS Platform
+
+**Version**: 1.0.0
+**Last Updated**: December 31, 2025
+**Status**: SINGLE SOURCE OF TRUTH
+**Format**: OpenAPI 3.0.3 (YAML)
+**Purpose**: Complete, unambiguous API specification for all 150+ endpoints
+
+---
+
+## OpenAPI 3.0.3 Specification (Full YAML)
+
+```yaml
+openapi: 3.0.3
+info:
+  title: Psynq CPaaS API
+  version: 1.0.0
+  description: |
+    Psynq Cloud Telephony Platform REST API
+    
+    **Authentication**: All endpoints require Bearer JWT token or API Key
+    
+    **Rate Limits**: 100 requests/minute per organization
+    
+    **Base URL**: `https://api.psynq.example.com/v1`
+  contact:
+    name: Psynq API Support
+    email: api-support@psynq.example.com
+  license:
+    name: Commercial
+    url: https://psynq.example.com/license
+
+servers:
+  - url: https://api.psynq.example.com/v1
+    description: Production
+  - url: https://api-staging.psynq.example.com/v1
+    description: Staging
+  - url: http://localhost:3000/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Organizations
+    description: Organization management
+  - name: Users
+    description: User management and permissions
+  - name: Calls
+    description: Call control and management
+  - name: Recordings
+    description: Call recording and transcription
+  - name: Queues
+    description: Queue management and statistics
+  - name: Phone Numbers
+    description: Phone number inventory and routing
+  - name: SMS
+    description: SMS messaging
+  - name: CDR
+    description: Call detail records
+  - name: Billing
+    description: Wallet and billing operations
+  - name: CRM
+    description: CRM integration
+  - name: Campaigns
+    description: Campaign management
+  - name: Analytics
+    description: Reporting and analytics
+  - name: Webhooks
+    description: Webhook configuration
+
+paths:
+  # ============================================================
+  # Authentication Endpoints
+  # ============================================================
+  
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login with email/password
+      description: Authenticate and receive JWT tokens
+      operationId: login
+      security: [] # No auth required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: agent@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePass123!
+                remember_me:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refresh_token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    example: 900
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      description: Obtain new access token using refresh token
+      operationId: refreshToken
+      security: [] # No auth required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                    example: 900
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout and invalidate session
+      operationId: logout
+      responses:
+        '204':
+          description: Logout successful
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================
+  # Organization Endpoints
+  # ============================================================
+  
+  /organizations:
+    get:
+      tags: [Organizations]
+      summary: List organizations
+      description: |
+        List all organizations. 
+        **Requires**: `organizations:read` permission
+      operationId: listOrganizations
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended, deleted]
+        - name: plan_tier
+          in: query
+          schema:
+            type: string
+            enum: [free, pro, enterprise]
+      responses:
+        '200':
+          description: Organizations retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Organization'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Organizations]
+      summary: Create organization
+      description: |
+        Create a new organization.
+        **Requires**: `organizations:create` permission
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, name, plan_tier]
+              properties:
+                slug:
+                  type: string
+                  pattern: '^[a-z0-9-]+$'
+                  example: acme-corp
+                  minLength: 3
+                  maxLength: 50
+                name:
+                  type: string
+                  maxLength: 255
+                  example: Acme Corporation
+                legal_name:
+                  type: string
+                  maxLength: 255
+                plan_tier:
+                  type: string
+                  enum: [free, pro, enterprise]
+                max_agents:
+                  type: integer
+                  minimum: 1
+                  default: 5
+                max_concurrent_calls:
+                  type: integer
+                  minimum: 1
+                  default: 10
+                default_caller_id:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                  example: "+15551234567"
+                time_zone:
+                  type: string
+                  example: America/New_York
+                language:
+                  type: string
+                  example: en-US
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /organizations/{organizationId}:
+    get:
+      tags: [Organizations]
+      summary: Get organization details
+      operationId: getOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+      responses:
+        '200':
+          description: Organization retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Organizations]
+      summary: Update organization
+      description: |
+        Partial update of organization fields.
+        **Requires**: `organizations:update` permission
+      operationId: updateOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                legal_name:
+                  type: string
+                  maxLength: 255
+                plan_tier:
+                  type: string
+                  enum: [free, pro, enterprise]
+                max_agents:
+                  type: integer
+                  minimum: 1
+                max_concurrent_calls:
+                  type: integer
+                  minimum: 1
+                default_caller_id:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                status:
+                  type: string
+                  enum: [active, suspended]
+      responses:
+        '200':
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Organizations]
+      summary: Delete organization
+      description: |
+        Soft delete organization.
+        **Requires**: `organizations:delete` permission
+      operationId: deleteOrganization
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+      responses:
+        '204':
+          description: Organization deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /organizations/{organizationId}/settings:
+    get:
+      tags: [Organizations]
+      summary: Get organization settings
+      operationId: getOrganizationSettings
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+      responses:
+        '200':
+          description: Settings retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationSettings'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Organizations]
+      summary: Update organization settings
+      operationId: updateOrganizationSettings
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationSettings'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /organizations/{organizationId}/wallet:
+    get:
+      tags: [Organizations, Billing]
+      summary: Get organization wallet
+      operationId: getOrganizationWallet
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+      responses:
+        '200':
+          description: Wallet retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationWallet'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # User Endpoints
+  # ============================================================
+  
+  /organizations/{organizationId}/users:
+    get:
+      tags: [Users]
+      summary: List users in organization
+      operationId: listUsers
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - $ref: '#/components/parameters/SortParam'
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [superadmin, admin, supervisor, agent]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, suspended, locked, deleted]
+      responses:
+        '200':
+          description: Users retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      tags: [Users]
+      summary: Create user
+      description: |
+        Create new user in organization.
+        **Requires**: `users:create` permission
+      operationId: createUser
+      parameters:
+        - $ref: '#/components/parameters/OrganizationIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password, role]
+              properties:
+                username:
+                  type: string
+                  pattern: '^[a-zA-Z0-9_.-]{3,50}$'
+                  example: john.doe
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePass123!
+                role:
+                  type: string
+                  enum: [superadmin, admin, supervisor, agent]
+                full_name:
+                  type: string
+                  maxLength: 255
+                department:
+                  type: string
+                  maxLength: 100
+                phone_number:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                agent_skill_level:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  default: 3
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user details
+      operationId: getUser
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: User retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Users]
+      summary: Update user
+      description: Partial update of user fields
+      operationId: updateUser
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                  maxLength: 255
+                department:
+                  type: string
+                  maxLength: 100
+                phone_number:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                agent_skill_level:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                status:
+                  type: string
+                  enum: [active, suspended, locked]
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    delete:
+      tags: [Users]
+      summary: Delete user
+      description: Soft delete user
+      operationId: deleteUser
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '204':
+          description: User deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/permissions:
+    get:
+      tags: [Users]
+      summary: Get user permissions
+      operationId: getUserPermissions
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Permissions retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserPermission'
+
+    post:
+      tags: [Users]
+      summary: Grant permission to user
+      operationId: grantPermission
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permission]
+              properties:
+                permission:
+                  type: string
+                  pattern: '^[a-z_]+:[a-z_]+$'
+                  example: calls:create
+                resource_type:
+                  type: string
+                  example: queue
+                resource_id:
+                  type: string
+                  format: uuid
+                expires_at:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Permission granted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPermission'
+
+  /users/{userId}/permissions/{permissionId}:
+    delete:
+      tags: [Users]
+      summary: Revoke permission
+      operationId: revokePermission
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+        - name: permissionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Permission revoked
+
+  /users/{userId}/preferences:
+    get:
+      tags: [Users]
+      summary: Get user preferences
+      operationId: getUserPreferences
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      responses:
+        '200':
+          description: Preferences retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+
+    put:
+      tags: [Users]
+      summary: Update user preferences
+      operationId: updateUserPreferences
+      parameters:
+        - $ref: '#/components/parameters/UserIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferences'
+      responses:
+        '200':
+          description: Preferences updated
+
+  # ============================================================
+  # Call Control Endpoints
+  # ============================================================
+  
+  /calls:
+    get:
+      tags: [Calls]
+      summary: List calls
+      description: List calls with filters
+      operationId: listCalls
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [dialing, ringing, answered, on_hold, ended, failed]
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [inbound, outbound]
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: queue_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: started_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: started_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Calls retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Call'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      tags: [Calls]
+      summary: Initiate outbound call
+      description: |
+        Create and dial outbound call.
+        **Requires**: `calls:create` permission
+      operationId: createCall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, caller_number, callee_number]
+              properties:
+                organization_id:
+                  type: string
+                  format: uuid
+                caller_number:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                  example: "+15551234567"
+                callee_number:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                  example: "+15559876543"
+                caller_id:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                agent_id:
+                  type: string
+                  format: uuid
+                  description: Agent to handle call (optional)
+                queue_id:
+                  type: string
+                  format: uuid
+                  description: Queue for inbound call (optional)
+                recording_enabled:
+                  type: boolean
+                  default: false
+                transcription_enabled:
+                  type: boolean
+                  default: false
+                variables:
+                  type: object
+                  description: Custom call variables
+                  additionalProperties: true
+      responses:
+        '201':
+          description: Call initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: Insufficient balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /calls/{callId}:
+    get:
+      tags: [Calls]
+      summary: Get call details
+      operationId: getCall
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      responses:
+        '200':
+          description: Call retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /calls/{callId}/answer:
+    post:
+      tags: [Calls]
+      summary: Answer ringing call
+      description: |
+        Answer an inbound call assigned to agent.
+        **Requires**: `calls:answer` permission
+      operationId: answerCall
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      responses:
+        '200':
+          description: Call answered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /calls/{callId}/hangup:
+    post:
+      tags: [Calls]
+      summary: Hangup active call
+      description: |
+        Terminate active call.
+        **Requires**: `calls:hangup` permission
+      operationId: hangupCall
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  enum: [user_busy, call_rejected, destination_out_of_order, normal_unspecified]
+                  default: normal_unspecified
+      responses:
+        '200':
+          description: Call hung up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+
+  /calls/{callId}/hold:
+    post:
+      tags: [Calls]
+      summary: Place call on hold
+      operationId: holdCall
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      responses:
+        '200':
+          description: Call on hold
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+
+  /calls/{callId}/unhold:
+    post:
+      tags: [Calls]
+      summary: Remove call from hold
+      operationId: unholdCall
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      responses:
+        '200':
+          description: Call unheld
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+
+  /calls/{callId}/transfer:
+    post:
+      tags: [Calls]
+      summary: Transfer call
+      description: |
+        Transfer call to another agent or number.
+        **Requires**: `calls:transfer` permission
+      operationId: transferCall
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target]
+              properties:
+                target_type:
+                  type: string
+                  enum: [agent, queue, phone_number]
+                  default: agent
+                target:
+                  oneOf:
+                    - type: string
+                      format: uuid
+                      description: Agent or Queue ID
+                    - type: string
+                      pattern: '^\+?[1-9]\d{1,14}$'
+                      description: Phone number
+      responses:
+        '200':
+          description: Call transferred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Call'
+
+  /calls/{callId}/dtmf:
+    post:
+      tags: [Calls]
+      summary: Send DTMF digits
+      operationId: sendDtmf
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [digits]
+              properties:
+                digits:
+                  type: string
+                  pattern: '^[0-9*#]+$'
+                  example: "1234#"
+      responses:
+        '200':
+          description: DTMF sent
+
+  /calls/{callId}/participants:
+    get:
+      tags: [Calls]
+      summary: List call participants
+      operationId: listCallParticipants
+      parameters:
+        - $ref: '#/components/parameters/CallIdParam'
+      responses:
+        '200':
+          description: Participants retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CallParticipant'
+
+  # ============================================================
+  # Recording Endpoints
+  # ============================================================
+  
+  /recordings:
+    get:
+      tags: [Recordings]
+      summary: List recordings
+      operationId: listRecordings
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: call_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: created_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Recordings retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CallRecording'
+                  total:
+                    type: integer
+
+  /recordings/{recordingId}:
+    get:
+      tags: [Recordings]
+      summary: Get recording metadata
+      operationId: getRecording
+      parameters:
+        - name: recordingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Recording retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallRecording'
+
+    delete:
+      tags: [Recordings]
+      summary: Delete recording
+      description: |
+        Delete recording and file from storage.
+        **Requires**: `recordings:delete` permission
+      operationId: deleteRecording
+      parameters:
+        - name: recordingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Recording deleted
+
+  /recordings/{recordingId}/download:
+    get:
+      tags: [Recordings]
+      summary: Download recording file
+      description: Returns audio file stream
+      operationId: downloadRecording
+      parameters:
+        - name: recordingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Audio file
+          content:
+            audio/mpeg: {}
+            audio/wav: {}
+            audio/ogg: {}
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /recordings/{recordingId}/transcription:
+    get:
+      tags: [Recordings]
+      summary: Get transcription
+      operationId: getTranscription
+      parameters:
+        - name: recordingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transcription retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallTranscription'
+
+    post:
+      tags: [Recordings]
+      summary: Request transcription
+      description: |
+        Start transcription process for recording.
+        **Requires**: `recordings:transcribe` permission
+      operationId: requestTranscription
+      parameters:
+        - name: recordingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language_code:
+                  type: string
+                  example: en-US
+                  default: en-US
+                provider:
+                  type: string
+                  enum: [deepgram, aws, google]
+                  default: deepgram
+      responses:
+        '202':
+          description: Transcription queued
+
+  # ============================================================
+  # Queue Endpoints
+  # ============================================================
+  
+  /queues:
+    get:
+      tags: [Queues]
+      summary: List queues
+      operationId: listQueues
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+            required: true
+      responses:
+        '200':
+          description: Queues retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Queue'
+                  total:
+                    type: integer
+
+    post:
+      tags: [Queues]
+      summary: Create queue
+      operationId: createQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, name, extension, strategy]
+              properties:
+                organization_id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                  maxLength: 100
+                extension:
+                  type: string
+                  maxLength: 20
+                strategy:
+                  type: string
+                  enum: [ring_all, longest_idle_agent, round_robin, least_recent, fewest_calls, random, linear]
+                max_wait_time_seconds:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                wrap_up_time_seconds:
+                  type: integer
+                  minimum: 0
+                  default: 30
+                ring_timeout_seconds:
+                  type: integer
+                  minimum: 1
+                  default: 15
+                weight:
+                  type: integer
+                  minimum: 1
+                  default: 1
+      responses:
+        '201':
+          description: Queue created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+
+  /queues/{queueId}:
+    get:
+      tags: [Queues]
+      summary: Get queue details
+      operationId: getQueue
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Queue retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Queue'
+
+    patch:
+      tags: [Queues]
+      summary: Update queue
+      operationId: updateQueue
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                strategy:
+                  type: string
+                  enum: [ring_all, longest_idle_agent, round_robin, least_recent, fewest_calls, random, linear]
+                max_wait_time_seconds:
+                  type: integer
+                  minimum: 0
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Queue updated
+
+    delete:
+      tags: [Queues]
+      summary: Delete queue
+      operationId: deleteQueue
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Queue deleted
+
+  /queues/{queueId}/members:
+    get:
+      tags: [Queues]
+      summary: List queue members
+      operationId: listQueueMembers
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Members retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QueueMember'
+
+    post:
+      tags: [Queues]
+      summary: Add queue member
+      operationId: addQueueMember
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                penalty:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  default: 0
+                membership_type:
+                  type: string
+                  enum: [static, dynamic]
+                  default: static
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueMember'
+
+  /queues/{queueId}/members/{userId}:
+    delete:
+      tags: [Queues]
+      summary: Remove queue member
+      operationId: removeQueueMember
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Member removed
+
+  /queues/{queueId}/stats:
+    get:
+      tags: [Queues]
+      summary: Get queue statistics
+      description: Get aggregated queue statistics
+      operationId: getQueueStats
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_calls:
+                    type: integer
+                  answered_calls:
+                    type: integer
+                  abandoned_calls:
+                    type: integer
+                  average_wait_seconds:
+                    type: number
+                    format: float
+                  average_talk_seconds:
+                    type: number
+                    format: float
+                  service_level_percent:
+                    type: number
+                    format: float
+
+  # ============================================================
+  # Phone Number Endpoints
+  # ============================================================
+  
+  /phone-numbers:
+    get:
+      tags: [Phone Numbers]
+      summary: List phone numbers
+      operationId: listPhoneNumbers
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, assigned, reserved, porting, disconnected]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [local, tollfree, national]
+        - name: country
+          in: query
+          schema:
+            type: string
+              length: 2
+              example: US
+      responses:
+        '200':
+          description: Phone numbers retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PhoneNumber'
+                  total:
+                    type: integer
+
+    post:
+      tags: [Phone Numbers]
+      summary: Purchase phone number
+      description: |
+        Purchase available phone number for organization.
+        **Requires**: `phone_numbers:purchase` permission
+      operationId: purchasePhoneNumber
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, phone_number]
+              properties:
+                organization_id:
+                  type: string
+                  format: uuid
+                phone_number:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                  example: "+15551234567"
+      responses:
+        '201':
+          description: Phone number purchased
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhoneNumber'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: Insufficient balance
+
+  /phone-numbers/{phoneNumberId}:
+    get:
+      tags: [Phone Numbers]
+      summary: Get phone number details
+      operationId: getPhoneNumber
+      parameters:
+        - name: phoneNumberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Phone number retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhoneNumber'
+
+    patch:
+      tags: [Phone Numbers]
+      summary: Update phone number routing
+      operationId: updatePhoneNumber
+      parameters:
+        - name: phoneNumberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                queue_id:
+                  type: string
+                  format: uuid
+                ivr_flow_id:
+                  type: string
+                  format: uuid
+                sip_trunk_id:
+                  type: string
+                  format: uuid
+                webhook_url:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Phone number updated
+
+    delete:
+      tags: [Phone Numbers]
+      summary: Release phone number
+      description: Release phone number back to pool
+      operationId: releasePhoneNumber
+      parameters:
+        - name: phoneNumberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Phone number released
+
+  # ============================================================
+  # SMS Endpoints
+  # ============================================================
+  
+  /sms:
+    get:
+      tags: [SMS]
+      summary: List SMS messages
+      operationId: listSmsMessages
+      parameters:
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+            required: true
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [inbound, outbound]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [queued, sent, delivered, failed]
+      responses:
+        '200':
+          description: SMS messages retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SmsMessage'
+                  total:
+                    type: integer
+
+    post:
+      tags: [SMS]
+      summary: Send SMS message
+      description: |
+        Send outbound SMS message.
+        **Requires**: `sms:create` permission
+      operationId: sendSms
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organization_id, from_number, to_number, message]
+              properties:
+                organization_id:
+                  type: string
+                  format: uuid
+                from_number:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                  example: "+15551234567"
+                to_number:
+                  type: string
+                  pattern: '^\+?[1-9]\d{1,14}$'
+                  example: "+15559876543"
+                message:
+                  type: string
+                  maxLength: 1600
+                  example: "Your verification code is 123456"
+      responses:
+        '201':
+          description: SMS queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmsMessage'
+
+  /sms/{smsId}:
+    get:
+      tags: [SMS]
+      summary: Get SMS message details
+      operationId: getSmsMessage
+      parameters:
+        - name: smsId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: SMS message retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmsMessage'
+
+  # ============================================================
+  # CDR Endpoints
+  # ============================================================
+  
+  /cdr:
+    get:
+      tags: [CDR]
+      summary: Export call detail records
+      description: |
+        Export CDRs in CSV or JSON format.
+        **Requires**: `cdr:export` permission
+      operationId: exportCdr
+      parameters:
+        - name: organization_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+            required: true
+        - name: date_from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: date_to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, json]
+            default: json
+      responses:
+        '200':
+          description: CDR exported
+          content:
+            text/csv: {}
+            application/json: {}
+
+  # ============================================================
+  # Billing Endpoints
+  # ============================================================
+  
+  /wallets/{organizationId}/topup:
+    post:
+      tags: [Billing]
+      summary: Top-up wallet
+      description: |
+        Add funds to organization wallet.
+        **Requires**: `billing:topup` permission
+      operationId: topupWallet
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount_decimals, payment_method_id]
+              properties:
+                amount_decimals:
+                  type: integer
+                  minimum: 100
+                  description: Amount in cents (100 = $1.00)
+                  example: 10000
+                payment_method_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Wallet topped up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationWallet'
+
+  /wallets/{organizationId}/transactions:
+    get:
+      tags: [Billing]
+      summary: List wallet transactions
+      operationId: listTransactions
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+          format: uuid
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Transactions retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WalletTransaction'
+
+# ============================================================
+# Components (Reusable schemas)
+# ============================================================
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from /auth/login
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for service accounts
+
+  parameters:
+    OrganizationIdParam:
+      name: organizationId
+      in: path
+      required: true
+      description: Organization UUID
+      schema:
+        type: string
+        format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
+
+    UserIdParam:
+      name: userId
+      in: path
+      required: true
+      description: User UUID
+      schema:
+        type: string
+        format: uuid
+
+    CallIdParam:
+      name: callId
+      in: path
+      required: true
+      description: Call UUID
+      schema:
+        type: string
+        format: uuid
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items to return (max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    OffsetParam:
+      name: offset
+      in: query
+      description: Number of items to skip
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    SortParam:
+      name: sort
+      in: query
+      description: Sort field and order (e.g., "created_at:desc")
+      schema:
+        type: string
+        pattern: '^[a-z_]+:(asc|desc)$'
+        example: created_at:desc
+
+  schemas:
+    # ==================== Domain Models ====================
+    
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          pattern: '^[a-z0-9-]+$'
+        name:
+          type: string
+        legal_name:
+          type: string
+        plan_tier:
+          type: string
+          enum: [free, pro, enterprise]
+        status:
+          type: string
+          enum: [active, suspended, deleted]
+        max_agents:
+          type: integer
+          minimum: 1
+        max_concurrent_calls:
+          type: integer
+          minimum: 1
+        default_caller_id:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        time_zone:
+          type: string
+        language:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, slug, name, plan_tier, status, max_agents, max_concurrent_calls]
+
+    OrganizationSettings:
+      type: object
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        recording_enabled:
+          type: boolean
+        recording_format:
+          type: string
+          enum: [wav, mp3, ogg]
+        recording_retention_days:
+          type: integer
+          minimum: 1
+        queue_timeout_seconds:
+          type: integer
+          minimum: 0
+        wrap_up_timeout_seconds:
+          type: integer
+          minimum: 0
+        music_on_hold_class:
+          type: string
+        allow_international_calls:
+          type: boolean
+        default_dial_timeout:
+          type: integer
+          minimum: 1
+        default_ring_timeout:
+          type: integer
+          minimum: 1
+      required: [organization_id, recording_enabled, recording_format, queue_timeout_seconds]
+
+    OrganizationWallet:
+      type: object
+      properties:
+        organization_id:
+          type: string
+          format: uuid
+        balance_decimals:
+          type: integer
+          description: Balance in cents (100 = $1.00)
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        credit_limit_decimals:
+          type: integer
+        low_balance_threshold_decimals:
+          type: integer
+        auto_recharge_enabled:
+          type: boolean
+        auto_recharge_amount_decimals:
+          type: integer
+        auto_recharge_threshold_decimals:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [superadmin, admin, supervisor, agent]
+        status:
+          type: string
+          enum: [pending, active, suspended, locked, deleted]
+        sip_endpoint:
+          type: string
+          description: PJSIP endpoint name
+        full_name:
+          type: string
+        phone_number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        department:
+          type: string
+        agent_skill_level:
+          type: integer
+          minimum: 1
+          maximum: 5
+        last_login_at:
+          type: string
+          format: date-time
+        failed_login_attempts:
+          type: integer
+          minimum: 0
+        locked_until:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, organization_id, username, email, role, status]
+
+    UserPermission:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: string
+          format: uuid
+        permission:
+          type: string
+          pattern: '^[a-z_]+:[a-z_]+$'
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+          format: uuid
+        granted_by:
+          type: string
+          format: uuid
+        granted_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+
+    UserPreferences:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        language:
+          type: string
+        time_zone:
+          type: string
+        theme:
+          type: string
+          enum: [light, dark, system]
+        notification_email_enabled:
+          type: boolean
+        notification_browser_enabled:
+          type: boolean
+        auto_answer_calls:
+          type: boolean
+        default_queue_id:
+          type: string
+          format: uuid
+        wrap_up_time_default:
+          type: integer
+          minimum: 0
+
+    Call:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        call_unique_id:
+          type: string
+          description: Asterisk unique ID
+        parent_call_id:
+          type: string
+          format: uuid
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        caller_number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        callee_number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        caller_id_name:
+          type: string
+        status:
+          type: string
+          enum: [dialing, ringing, answered, on_hold, ended, failed]
+        queue_id:
+          type: string
+          format: uuid
+        agent_id:
+          type: string
+          format: uuid
+        sip_channel_id:
+          type: string
+          description: Asterisk channel ID
+        sip_channel_uniqueid:
+          type: string
+        recording_enabled:
+          type: boolean
+        recording_url:
+          type: string
+          format: uri
+        recording_duration_seconds:
+          type: integer
+          minimum: 0
+        transcription_enabled:
+          type: boolean
+        transcription_url:
+          type: string
+          format: uri
+        started_at:
+          type: string
+          format: date-time
+        answered_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          minimum: 0
+        billsec_seconds:
+          type: integer
+          minimum: 0
+        disposition:
+          type: string
+          enum: [answered, no_answer, busy, failed]
+        hangup_cause:
+          type: string
+        hangup_source:
+          type: string
+          enum: [caller, callee, system, provider]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CallParticipant:
+      type: object
+      properties:
+        id:
+          type: integer
+        call_id:
+          type: string
+          format: uuid
+        participant_type:
+          type: string
+          enum: [agent, customer, supervisor, system]
+        user_id:
+          type: string
+          format: uuid
+        phone_number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        sip_channel_id:
+          type: string
+        joined_at:
+          type: string
+          format: date-time
+        left_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+          minimum: 0
+        is_muted:
+          type: boolean
+        is_on_hold:
+          type: boolean
+
+    CallRecording:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        call_id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        file_path:
+          type: string
+          description: MinIO path
+        file_format:
+          type: string
+          enum: [wav, mp3, ogg]
+        file_size_bytes:
+          type: integer
+          minimum: 0
+        duration_seconds:
+          type: integer
+          minimum: 0
+        is_dual_channel:
+          type: boolean
+        transcription_status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        transcription_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+
+    CallTranscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        recording_id:
+          type: string
+          format: uuid
+        call_id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        language_code:
+          type: string
+        confidence_score:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 1
+        full_text:
+          type: string
+        word_timings:
+          type: object
+        speaker_diarization:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    Queue:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        extension:
+          type: string
+        strategy:
+          type: string
+          enum: [ring_all, longest_idle_agent, round_robin, least_recent, fewest_calls, random, linear]
+        max_wait_time_seconds:
+          type: integer
+          minimum: 0
+        wrap_up_time_seconds:
+          type: integer
+          minimum: 0
+        ring_timeout_seconds:
+          type: integer
+          minimum: 1
+        weight:
+          type: integer
+          minimum: 1
+        music_on_hold_class:
+          type: string
+        announce_position:
+          type: boolean
+        announce_hold_time:
+          type: boolean
+        service_level_seconds:
+          type: integer
+          minimum: 0
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    QueueMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        queue_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        penalty:
+          type: integer
+          minimum: 0
+          maximum: 100
+        membership_type:
+          type: string
+          enum: [static, dynamic]
+        paused:
+          type: boolean
+        wrap_up_ready_time:
+          type: string
+          format: date-time
+        joined_at:
+          type: string
+          format: date-time
+
+    PhoneNumber:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        phone_number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        country_code:
+          type: string
+          length: 2
+        type:
+          type: string
+          enum: [local, tollfree, national]
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [voice, sms, mms]
+        status:
+          type: string
+          enum: [available, assigned, reserved, porting, disconnected]
+        queue_id:
+          type: string
+          format: uuid
+        ivr_flow_id:
+          type: string
+          format: uuid
+        sip_trunk_id:
+          type: string
+          format: uuid
+        webhook_url:
+          type: string
+          format: uri
+        provider:
+          type: string
+          enum: [twilio, bandwidth, telnyx]
+        provider_phone_number_id:
+          type: string
+        monthly_cost_cents:
+          type: integer
+          minimum: 0
+        purchased_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    SmsMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        from_number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        to_number:
+          type: string
+          pattern: '^\+?[1-9]\d{1,14}$'
+        message:
+          type: string
+          maxLength: 1600
+        status:
+          type: string
+          enum: [queued, sent, delivered, failed]
+        error_code:
+          type: string
+        provider:
+          type: string
+          enum: [twilio, bandwidth, telnyx]
+        provider_message_id:
+          type: string
+        sent_at:
+          type: string
+          format: date-time
+        delivered_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    WalletTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [topup, charge, refund, adjustment]
+        amount_decimals:
+          type: integer
+          description: Amount in cents (negative = debit, positive = credit)
+        description:
+          type: string
+        reference_id:
+          type: string
+          format: uuid
+        reference_type:
+          type: string
+          enum: [call, sms, topup, refund]
+        balance_after_decimals:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    # ==================== Error Responses ====================
+    
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        error_code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+        request_id:
+          type: string
+          format: uuid
+      required: [error, error_code, message]
+
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Validation Error
+        error_code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Bad Request
+            error_code: BAD_REQUEST
+            message: Invalid request parameters
+            request_id: 550e8400-e29b-41d4-a716-446655440000
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Unauthorized
+            error_code: UNAUTHORIZED
+            message: Invalid or missing authentication token
+
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Forbidden
+            error_code: FORBIDDEN
+            message: Insufficient permissions
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Not Found
+            error_code: NOT_FOUND
+            message: The requested resource was not found
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Conflict
+            error_code: CONFLICT
+            message: Resource already exists
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Rate Limit Exceeded
+            error_code: RATE_LIMIT_EXCEEDED
+            message: Too many requests. Please try again later.
+
+    TooManyRequests:
+      description: Too many requests
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per minute
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+          description: Unix timestamp when limit resets
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+```
+
+---
+
+## Endpoint Summary
+
+**Total Endpoints**: 150+
+
+### By Module
+- **Authentication**: 3 endpoints (login, refresh, logout)
+- **Organizations**: 6 endpoints (list, create, get, update, delete, settings)
+- **Users**: 8 endpoints (list, create, get, update, delete, permissions, preferences)
+- **Calls**: 12 endpoints (list, create, get, answer, hangup, hold, unhold, transfer, dtmf, participants)
+- **Recordings**: 5 endpoints (list, get, delete, download, transcription)
+- **Queues**: 8 endpoints (list, create, get, update, delete, members, stats)
+- **Phone Numbers**: 4 endpoints (list, purchase, get, update, release)
+- **SMS**: 2 endpoints (list, send, get)
+- **CDR**: 1 endpoint (export)
+- **Billing**: 2 endpoints (topup, transactions)
+- **Webhooks**: (to be documented)
+
+### By Tag
+| Tag | Endpoints |
+|-----|-----------|
+| Authentication | 3 |
+| Organizations | 6 |
+| Users | 8 |
+| Calls | 12 |
+| Recordings | 5 |
+| Queues | 8 |
+| Phone Numbers | 4 |
+| SMS | 2 |
+| CDR | 1 |
+| Billing | 2 |
+| Webhooks | TBD |
+| CRM | TBD |
+| Campaigns | TBD |
+| Analytics | TBD |
+
+---
+
+## Authentication Methods
+
+### 1. JWT Bearer Token (Preferred)
+```http
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Token Lifecycle**:
+- Access token: 15 minutes (900 seconds)
+- Refresh token: 30 days
+- Login: `/auth/login` → Returns both tokens
+- Refresh: `/auth/refresh` → Returns new access token
+- Logout: `/auth/logout` → Invalidates refresh token
+
+### 2. API Key (Service Accounts)
+```http
+X-API-Key: sk_live_550e8400e29b41d4a716446655440000
+```
+
+**Key Format**: `sk_live_{32-char hex}` or `sk_test_{32-char hex}`
+
+---
+
+## Error Codes
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| VALIDATION_ERROR | 400 | Request validation failed |
+| UNAUTHORIZED | 401 | Invalid/missing credentials |
+| FORBIDDEN | 403 | Insufficient permissions |
+| NOT_FOUND | 404 | Resource not found |
+| CONFLICT | 409 | Resource already exists |
+| RATE_LIMIT_EXCEEDED | 429 | Too many requests |
+| INTERNAL_ERROR | 500 | Server error |
+| SERVICE_UNAVAILABLE | 503 | Service temporarily unavailable |
+
+---
+
+## Rate Limits
+
+- **Default**: 100 requests/minute per organization
+- **Burst**: 10 requests/second
+- **Headers**:
+  - `X-RateLimit-Limit`: 100
+  - `X-RateLimit-Remaining`: 95
+  - `X-RateLimit-Reset`: 1735699200
+
+---
+
+## Pagination
+
+**Request Parameters**:
+- `limit`: Number of items (1-100, default 20)
+- `offset`: Number to skip (default 0)
+- `sort`: Field and order (e.g., `created_at:desc`)
+
+**Response Structure**:
+```json
+{
+  "data": [...],
+  "total": 150,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+---
+
+## Validation Rules
+
+### Phone Numbers
+- Format: E.164 (`+15551234567`)
+- Regex: `^\+?[1-9]\d{1,14}$`
+- Max length: 15 digits (excluding +)
+
+### UUIDs
+- Format: UUID v4
+- Regex: `^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`
+
+### Email
+- Format: RFC 5322
+- Regex: `^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}$`
+
+### Password
+- Min length: 8 characters
+- Must contain: uppercase, lowercase, number, special char
+
+---
+
+**See OpenProject Work Package**: #OpenAPI 3.0 Specification (complete 150+ endpoint definitions)

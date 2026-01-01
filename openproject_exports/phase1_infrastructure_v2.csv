@@ -1,0 +1,215 @@
+Subject,Type,Description,Parent,Priority,Estimated time,Assignee,Status,Start date,Finish date,Progress,Responsible,Accountable,Consulted,Informed,Acceptance Criteria,Definition of Ready,Definition of Done,AI Agent Instructions,Notes,Tags,Custom Field 1
+"Phase 1: Infrastructure Foundation","Phase","Complete infrastructure setup for Psitrix Psynq CPaaS platform.
+
+# High-Level Design (HLD)
+- Docker Compose orchestration for all services
+- PostgreSQL 14+ with streaming replication (primary + replica)
+- Redis 7+ cluster (3 masters, 3 replicas)
+- MinIO S3-compatible storage for recordings
+- NGINX reverse proxy with SSL termination
+- Monitoring stack (Prometheus, Grafana, Alertmanager)
+- Logging stack (Loki, Promtail)
+- Backup automation for PostgreSQL and MinIO
+
+# Architecture Decisions
+- Single-node deployment for Phase 1 (multi-node in Phase 2)
+- No Kubernetes (constraint)
+- Docker volumes for persistence
+- Internal Docker networks for service isolation
+- External access only through NGINX
+
+# Deliverables
+- deploy/docker-compose.yml (all services)
+- PostgreSQL HA setup with repmgr
+- Redis cluster configuration
+- MinIO buckets and policies
+- NGINX config with reverse proxy rules
+- Monitoring dashboards
+- Backup/restore scripts
+- Health check endpoints","","High","400h","","New","","","0%","","","","","","","","","infrastructure,phase1","",""
+"Epic: Docker Orchestration","Epic","Set up Docker Compose orchestration for all infrastructure services.","Phase 1: Infrastructure Foundation","High","80h","","New","","","0%","","","","","","","","","docker,orchestration","",""
+"Feature: Docker Network Topology","Feature","Design and implement isolated Docker networks for service tiers.","Epic: Docker Orchestration","High","12h","","New","","","0%","","","","","","","","","docker,networks","",""
+"Task: Define Docker Networks in docker-compose.yml","Task","Create the network definitions to isolate frontend, backend, and database tiers.
+
+# Low-Level Design (LLD)
+## File Path
+deploy/docker-compose.yml
+
+## Network Definitions
+```yaml
+networks:
+  frontend:
+    driver: bridge
+    internal: false
+  backend:
+    driver: bridge
+    internal: true
+  db_net:
+    driver: bridge
+    internal: true
+  monitoring_net:
+    driver: bridge
+    internal: true
+```
+
+# Definition of Done (DOD)
+- [ ] Networks defined in docker-compose.yml
+- [ ] `frontend` network allows external traffic
+- [ ] `db_net` and `backend` are marked as `internal: true`
+- [ ] `docker-compose config` validates","Feature: Docker Network Topology","Normal","2h","","New","","","0%","","","","","Networks are isolated and functional","Network plan approved","Implement networks in YAML","NO MOCKS: Use real Docker network drivers.","","docker,networks",""
+"Feature: Persistent Volume Management","Feature","Configure Docker volumes for all stateful services.","Epic: Docker Orchestration","High","16h","","New","","","0%","","","","","","","","","docker,volumes","",""
+"Task: Define Docker Volumes in docker-compose.yml","Task","Create volume definitions for Postgres, Redis, MinIO, and Monitoring.
+
+# Low-Level Design (LLD)
+## File Path
+deploy/docker-compose.yml
+
+## Volume Definitions
+```yaml
+volumes:
+  postgres_primary_data:
+  postgres_replica_data:
+  redis_data_1:
+  redis_data_2:
+  redis_data_3:
+  redis_data_4:
+  redis_data_5:
+  redis_data_6:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+```
+
+# Definition of Done (DOD)
+- [ ] All 11 volumes defined
+- [ ] Volumes mapped to correct container paths
+- [ ] Persistence verified after container restart","Feature: Persistent Volume Management","Normal","4h","","New","","","0%","","","","","Data persists across restarts","Volume list defined","Implement volumes in YAML","NO MOCKS: Use real Docker volumes.","","docker,volumes",""
+"Feature: Secrets Management","Feature","Implement secure management of passwords and keys using Docker Secrets.","Epic: Docker Orchestration","High","20h","","New","","","0%","","","","","","","","","docker,secrets","",""
+"Task: Create Secret Files","Task","Create the physical files to store sensitive credentials.
+
+# Low-Level Design (LLD)
+## File Paths
+- deploy/secrets/postgres_password.txt
+- deploy/secrets/redis_password.txt
+- deploy/secrets/minio_root_password.txt
+
+# Definition of Done (DOD)
+- [ ] Files created with random 32-char strings
+- [ ] Files added to .gitignore
+- [ ] Permissions set to 600","Feature: Secrets Management","Normal","2h","","New","","","0%","","","","","Secrets exist and are secure","Secret list defined","Create files and set permissions","NO MOCKS: Use real random strings.","","docker,secrets",""
+"Task: Map Secrets in docker-compose.yml","Task","Configure services to use the secret files.
+
+# Low-Level Design (LLD)
+## File Path
+deploy/docker-compose.yml
+
+## Configuration
+```yaml
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+```
+
+# Definition of Done (DOD)
+- [ ] Secrets defined at top level
+- [ ] Secrets mapped to `postgres_primary` and `postgres_replica`
+- [ ] Services can read secrets from `/run/secrets/`","Feature: Secrets Management","Normal","4h","","New","","","0%","","","","","Services access secrets correctly","Secret files exist","Update docker-compose.yml","NO MOCKS: Use real Docker secrets.","","docker,secrets",""
+"Epic: PostgreSQL High Availability","Epic","Set up PostgreSQL with high availability using streaming replication and repmgr.","Phase 1: Infrastructure Foundation","High","80h","","New","","","0%","","","","","","","","","postgres,ha","",""
+"Feature: PostgreSQL Primary Setup","Feature","Configure the primary PostgreSQL instance for replication.","Epic: PostgreSQL High Availability","High","24h","","New","","","0%","","","","","","","","","postgres,primary","",""
+"Task: Create deploy/db/postgres/primary/postgresql.conf","Task","Configure the primary database for replication.
+
+# Low-Level Design (LLD)
+## Parameters
+```ini
+listen_addresses = '*'
+wal_level = replica
+max_wal_senders = 10
+wal_keep_size = 1GB
+hot_standby = on
+archive_mode = on
+archive_command = 'test ! -f /var/lib/postgresql/data/archive/%f && cp %p /var/lib/postgresql/data/archive/%f'
+max_replication_slots = 10
+```
+
+# Definition of Done (DOD)
+- [ ] Config file created
+- [ ] All replication parameters set
+- [ ] Archiving directory `/var/lib/postgresql/data/archive` exists","Feature: PostgreSQL Primary Setup","Normal","4h","","New","","","0%","","","","","Config applied to primary","PG parameters defined","Create config file","NO MOCKS: Use real PG 14 parameters.","","postgres,config",""
+"Task: Create deploy/db/postgres/primary/pg_hba.conf","Task","Configure host-based authentication for replication.
+
+# Low-Level Design (LLD)
+## Rules
+```ini
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            md5
+host    replication     repmgr          0.0.0.0/0               md5
+host    all             all             0.0.0.0/0               md5
+```
+
+# Definition of Done (DOD)
+- [ ] pg_hba.conf created
+- [ ] `repmgr` user has replication access
+- [ ] External access restricted to internal network CIDR","Feature: PostgreSQL Primary Setup","Normal","2h","","New","","","0%","","","","","Access rules allow replication","Network CIDRs defined","Create hba file","NO MOCKS: Use secure CIDR ranges.","","postgres,security",""
+"Task: Create PostgreSQL Initialization SQL","Task","Create the initial schema and users for the platform.
+
+# Low-Level Design (LLD)
+## File Path
+deploy/db/01-init.sql
+
+## SQL
+```sql
+CREATE USER repmgr WITH REPLICATION PASSWORD 'repmgr_pass';
+CREATE DATABASE psynq;
+CREATE DATABASE repmgr OWNER repmgr;
+```
+
+# Definition of Done (DOD)
+- [ ] SQL file created
+- [ ] Users and DBs created on startup
+- [ ] Permissions verified","Feature: PostgreSQL Primary Setup","Normal","4h","","New","","","0%","","","","","DBs and users exist","Schema requirements defined","Create SQL file","NO MOCKS: Use real SQL commands.","","postgres,init",""
+"Feature: PostgreSQL Replica Setup","Feature","Configure the standby PostgreSQL instance for automatic failover.","Epic: PostgreSQL High Availability","High","24h","","New","","","0%","","","","","","","","","postgres,replica","",""
+"Task: Create replica initialization script","Task","Create a script to perform pg_basebackup for the replica.
+
+# Low-Level Design (LLD)
+## File Path
+deploy/db/postgres/replica/init-replica.sh
+
+## Logic
+```bash
+#!/bin/bash
+until pg_isready -h postgres_primary -U psynq_admin; do
+  echo ""Waiting for primary...""
+  sleep 2
+done
+
+if [ ! -s ""$PGDATA/PG_VERSION"" ]; then
+  pg_basebackup -h postgres_primary -D $PGDATA -U repmgr -P -v -R --slot=replica_1
+fi
+```
+
+# Definition of Done (DOD)
+- [ ] Script created and executable
+- [ ] Successfully clones primary data
+- [ ] `standby.signal` file created in data dir","Feature: PostgreSQL Replica Setup","Normal","8h","","New","","","0%","","","","","Replica syncs with primary","Repmgr credentials ready","Create bash script","NO MOCKS: Use real pg_basebackup flags.","","postgres,sync",""
+"Task: Configure repmgr for failover","Task","Set up repmgr.conf for both primary and replica.
+
+# Low-Level Design (LLD)
+## File Path
+deploy/db/postgres/repmgr.conf
+
+## Parameters
+```ini
+node_id=1
+node_name='node1'
+conninfo='host=postgres_primary user=repmgr dbname=repmgr connect_timeout=2'
+data_directory='/var/lib/postgresql/data'
+failover='automatic'
+promote_command='/usr/bin/repmgr standby promote -f /etc/repmgr.conf --log-to-file'
+follow_command='/usr/bin/repmgr standby follow -f /etc/repmgr.conf --log-to-file --upstream-node-id=%n'
+```
+
+# Definition of Done (DOD)
+- [ ] repmgr.conf created for both nodes
+- [ ] Nodes registered in repmgr
+- [ ] `repmgr cluster show` displays both nodes","Feature: PostgreSQL Replica Setup","Normal","8h","","New","","","0%","","","","","Failover is automatic","Repmgr requirements defined","Create config and register nodes","NO MOCKS: Use real repmgr commands.","","postgres,repmgr",""

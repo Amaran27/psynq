@@ -1,0 +1,79 @@
+# OpenProject Community Edition - Docker Compose for Psitrix Psynq
+# This is a separate service from the main application stack
+# 
+# IMPORTANT: This runs independently from docker-compose.dev.yml
+# To start: docker-compose -f docker-compose.yml up -d
+# To stop: docker-compose -f docker-compose.yml down
+
+services:
+  # PostgreSQL database for OpenProject (separate from psynq_db)
+  postgres:
+    image: postgres:15-alpine
+    container_name: psynq-openproject-db
+    environment:
+      POSTGRES_USER: openproject
+      POSTGRES_PASSWORD: openproject_password_change_me
+      POSTGRES_DB: openproject
+    volumes:
+      - pg_opdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openproject -d openproject || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - openproject-net
+
+  # OpenProject Community Edition
+  openproject:
+    image: openproject/openproject:14
+    container_name: psynq-openproject
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: "postgresql://openproject:openproject_password_change_me@postgres:5432/openproject"
+      DATABASE_POOL_SIZE: "20"
+      OPENPROJECT_HOST__NAME: "localhost:8080"
+      OPENPROJECT_HTTPS: "false"
+      OPENPROJECT_SECRET_KEY_BASE: "change_this_to_a_secure_random_string_in_production"
+      OPENPROJECT_DISABLE__API: "false"
+      
+    volumes:
+      - op_assets:/var/openproject/assets
+      - op_files:/var/openproject/files
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - openproject-net
+
+  # Memcached for OpenProject performance
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: psynq-openproject-memcached
+    command: memcached -m 64
+    networks:
+      - openproject-net
+    restart: unless-stopped
+
+networks:
+  openproject-net:
+    name: psynq-openproject
+    driver: bridge
+
+volumes:
+  pg_opdata:
+    driver: local
+  op_assets:
+    driver: local
+  op_files:
+    driver: local

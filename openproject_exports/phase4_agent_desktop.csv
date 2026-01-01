@@ -1,0 +1,95 @@
+Subject,Type,Description,Parent,Priority,Estimated time,Assignee,Status,Start date,Finish date,Progress,Responsible,Accountable,Consulted,Informed,Acceptance Criteria,Definition of Ready,Definition of Done,AI Agent Instructions,Notes,Tags,Custom Field 1
+"Phase 4: Agent Desktop (Web)","Phase","Develop the web-based agent desktop for call handling and CRM integration.
+
+# High-Level Design (HLD)
+- React 18 + Next.js (App Router)
+- WebRTC for browser-based audio
+- SIP.js or JsSIP for signaling
+- WebSocket for real-time state updates
+- Zustand/Redux for state management
+- Tailwind CSS for UI
+- Component-based architecture (Container-Presenter)
+
+# Architecture Decisions
+- Use WebRTC for all audio (no external softphone required)
+- Implement a robust WebRTC adapter for browser compatibility
+- Centralized state for agent status and active calls
+- Real-time event handling via WebSockets
+- Responsive design for various screen sizes
+
+# Deliverables
+- packages/web/src/components/softphone
+- packages/web/src/hooks/useWebRTC.ts
+- packages/web/src/store/agentStore.ts
+- packages/web/src/services/websocket.service.ts
+- Agent login and status management UI","","High","300h","","New","","","0%","","","","","","","","","web,agent,phase4","",""
+"Epic: WebRTC Softphone Implementation","Epic","Implement the browser-based softphone using WebRTC and SIP.js.","Phase 4: Agent Desktop (Web)","High","80h","","New","","","0%","","","","","","","","","webrtc,softphone","",""
+"Feature: WebRTC Media Handling","Feature","Create a robust adapter for WebRTC media handling.","Epic: WebRTC Softphone Implementation","High","20h","","New","","","0%","","","","","","","","","webrtc,media","",""
+"Task: Implement useWebRTC hook","Task","Create a custom React hook for managing WebRTC connections and media streams.
+
+# Low-Level Design (LLD)
+## File Path
+`packages/web/src/hooks/useWebRTC.ts`
+
+## Functionality
+- Initialize `RTCPeerConnection`
+- Handle ICE candidates and SDP exchange
+- Manage local and remote `MediaStream` objects
+- Provide methods for mute/unmute and volume control
+
+# Definition of Done (DOD)
+- [ ] Hook implemented with full TypeScript types
+- [ ] Unit tests for stream management
+- [ ] Integration with a test WebRTC echo service","Feature: WebRTC Media Handling","Normal","8h","","New","","","0%","","","","","Hook manages streams correctly","WebRTC requirements defined","Implement hook and tests","NO MOCKS: Use real WebRTC APIs.","","webrtc,hook",""
+"Feature: SIP.js Integration","Feature","Integrate SIP.js for signaling and call control.","Epic: WebRTC Softphone Implementation","High","30h","","New","","","0%","","","","","","","","","sipjs,signaling","",""
+"Task: Create SipService class","Task","Implement a service to handle SIP registration and session management.
+
+# Low-Level Design (LLD)
+## File Path
+`packages/web/src/services/sip.service.ts`
+
+## Logic
+- Initialize `UserAgent` from SIP.js
+- Handle `invite` and `message` events
+- Manage `Session` objects for active calls
+
+# Definition of Done (DOD)
+- [ ] Service connects to Asterisk via WSS
+- [ ] Successful registration with SIP credentials
+- [ ] Can initiate and receive calls","Feature: SIP.js Integration","Normal","12h","","New","","","0%","","","","","SIP signaling works via WSS","SIP credentials and WSS URL ready","Implement service class","NO MOCKS: Use real SIP.js library.","","sipjs,service",""
+"Epic: Agent State Management","Epic","Implement the state management for agent status (Available, Busy, Break, etc.).","Phase 4: Agent Desktop (Web)","High","50h","","New","","","0%","","","","","","","","","agent,state","",""
+"Feature: Zustand Store for Agent","Feature","Create a centralized store for agent status and call state.","Epic: Agent State Management","High","15h","","New","","","0%","","","","","","","","","zustand,store","",""
+"Task: Implement useAgentStore","Task","Create the Zustand store for agent state.
+
+# Low-Level Design (LLD)
+## State
+- `status`: 'AVAILABLE', 'BUSY', 'BREAK', 'OFFLINE'
+- `activeCall`: Call object or null
+- `agentInfo`: User details
+
+## Actions
+- `setStatus(status)`
+- `setActiveCall(call)`
+- `clearActiveCall()`
+
+# Definition of Done (DOD)
+- [ ] Store implemented with TypeScript interfaces
+- [ ] Actions update state correctly
+- [ ] Persist state to local storage where appropriate","Feature: Zustand Store for Agent","Normal","6h","","New","","","0%","","","","","Store manages agent state correctly","State model defined","Implement store and actions","NO MOCKS: Use real Zustand patterns.","","zustand,agent",""
+"Epic: Real-time Event Integration","Epic","Integrate the web client with the backend WebSocket for real-time updates.","Phase 4: Agent Desktop (Web)","High","50h","","New","","","0%","","","","","","","","","websocket,events","",""
+"Feature: WebSocket Service","Feature","Implement a service for real-time communication with the backend.","Epic: Real-time Event Integration","High","20h","","New","","","0%","","","","","","","","","websocket,service","",""
+"Task: Implement SocketService class","Task","Create a service using `socket.io-client` for real-time events.
+
+# Low-Level Design (LLD)
+## File Path
+`packages/web/src/services/socket.service.ts`
+
+## Events
+- `call:started`, `call:ended`
+- `agent:status_changed`
+- `notification:new`
+
+# Definition of Done (DOD)
+- [ ] Service connects to backend WebSocket
+- [ ] Events are received and dispatched to the store
+- [ ] Reconnection logic implemented","Feature: WebSocket Service","Normal","8h","","New","","","0%","","","","","Events received in real-time","WebSocket URL ready","Implement service class","NO MOCKS: Use real socket.io-client.","","websocket,client",""
