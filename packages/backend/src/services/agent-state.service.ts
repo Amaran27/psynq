@@ -25,7 +25,9 @@ export class AgentStateService {
     user.lastStatusChangedAt = new Date();
     await this.userRepository.save(user);
 
-    this.logger.log(`Agent ${user.username} changed status from ${oldStatus} to ${status}`);
+    this.logger.log(
+      `Agent ${user.username} changed status from ${oldStatus} to ${status}`,
+    );
 
     await this.eventBus.publish({
       type: 'agent.status_changed',
@@ -40,15 +42,21 @@ export class AgentStateService {
     return user?.status === AgentStatus.AVAILABLE;
   }
 
-  async getBestAvailableAgent(orgId: string, requiredSkills: string[]): Promise<UserEntity | null> {
-    const query = this.userRepository.createQueryBuilder('user')
+  async getBestAvailableAgent(
+    orgId: string,
+    requiredSkills: string[],
+  ): Promise<UserEntity | null> {
+    const query = this.userRepository
+      .createQueryBuilder('user')
       .where('user.organizationId = :orgId', { orgId })
       .andWhere('user.status = :status', { status: AgentStatus.AVAILABLE });
 
     if (requiredSkills.length > 0) {
       // Basic skill matching: must have all required skills
       requiredSkills.forEach((skill, index) => {
-        query.andWhere(`user.skills LIKE :skill${index}`, { [`skill${index}`]: `%${skill}%` });
+        query.andWhere(`user.skills LIKE :skill${index}`, {
+          [`skill${index}`]: `%${skill}%`,
+        });
       });
     }
 

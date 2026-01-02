@@ -10,7 +10,7 @@ export class CallParticipantService {
   constructor(
     @InjectRepository(CallParticipantEntity)
     private readonly participantRepository: Repository<CallParticipantEntity>,
-    private readonly gateway: CallGateway
+    private readonly gateway: CallGateway,
   ) {}
 
   /**
@@ -19,72 +19,85 @@ export class CallParticipantService {
   async getParticipantsByCallId(callId: string): Promise<CallParticipant[]> {
     return this.participantRepository.find({
       where: { callId },
-      order: { joinedAt: 'ASC' }
+      order: { joinedAt: 'ASC' },
     });
   }
 
   /**
    * Gets a specific participant by their ID
    */
-  async getParticipantById(participantId: string): Promise<CallParticipant | null> {
+  async getParticipantById(
+    participantId: string,
+  ): Promise<CallParticipant | null> {
     return this.participantRepository.findOne({ where: { id: participantId } });
   }
 
   /**
    * Adds a participant to a call
    */
-  async addParticipant(participant: Omit<CallParticipant, 'id' | 'joinedAt'>): Promise<CallParticipant> {
+  async addParticipant(
+    participant: Omit<CallParticipant, 'id' | 'joinedAt'>,
+  ): Promise<CallParticipant> {
     const newParticipant = this.participantRepository.create({
       ...participant,
       id: this.generateParticipantId(),
       joinedAt: new Date(),
-      isMuted: participant.participantType === 'supervisor' ? true : participant.isMuted,
-      isOnHold: false
+      isMuted:
+        participant.participantType === 'supervisor'
+          ? true
+          : participant.isMuted,
+      isOnHold: false,
     });
-    
+
     const saved = await this.participantRepository.save(newParticipant);
-    
+
     // Emit real-time update
     this.gateway.server.emit('participantAdded', saved);
-    
+
     return saved;
   }
 
   /**
    * Updates a participant's mute state
    */
-  async updateParticipantMuteState(participantId: string, isMuted: boolean): Promise<CallParticipant | null> {
+  async updateParticipantMuteState(
+    participantId: string,
+    isMuted: boolean,
+  ): Promise<CallParticipant | null> {
     const participant = await this.getParticipantById(participantId);
     if (!participant) return null;
 
     const updated = await this.participantRepository.save({
       ...participant,
       isMuted,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Emit real-time update
     this.gateway.server.emit('participantUpdated', updated);
-    
+
     return updated;
   }
 
   /**
    * Updates a participant's hold state
    */
-  async updateParticipantHoldState(participantId: string, isOnHold: boolean): Promise<CallParticipantEntity | null> {
+  async updateParticipantHoldState(
+    participantId: string,
+    isOnHold: boolean,
+  ): Promise<CallParticipantEntity | null> {
     const participant = await this.getParticipantById(participantId);
     if (!participant) return null;
 
     const updated = await this.participantRepository.save({
       ...participant,
       isOnHold,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Emit real-time update
     this.gateway.server.emit('participantUpdated', updated);
-    
+
     return updated;
   }
 
@@ -97,37 +110,46 @@ export class CallParticipantService {
 
     await this.participantRepository.save({
       ...participant,
-      leftAt: new Date()
+      leftAt: new Date(),
     });
 
     // Emit real-time update
-    this.gateway.server.emit('participantRemoved', { participantId, callId: participant.callId });
+    this.gateway.server.emit('participantRemoved', {
+      participantId,
+      callId: participant.callId,
+    });
   }
 
   /**
    * Gets all supervisors for a call
    */
-  async getSupervisorsByCallId(callId: string): Promise<CallParticipantEntity[]> {
+  async getSupervisorsByCallId(
+    callId: string,
+  ): Promise<CallParticipantEntity[]> {
     return this.participantRepository.find({
-      where: { callId, participantType: 'supervisor', leftAt: IsNull() }
+      where: { callId, participantType: 'supervisor', leftAt: IsNull() },
     });
   }
 
   /**
    * Gets the agent for a call
    */
-  async getAgentByCallId(callId: string): Promise<CallParticipantEntity | null> {
+  async getAgentByCallId(
+    callId: string,
+  ): Promise<CallParticipantEntity | null> {
     return this.participantRepository.findOne({
-      where: { callId, participantType: 'agent', leftAt: IsNull() }
+      where: { callId, participantType: 'agent', leftAt: IsNull() },
     });
   }
 
   /**
    * Gets the customer for a call
    */
-  async getCustomerByCallId(callId: string): Promise<CallParticipantEntity | null> {
+  async getCustomerByCallId(
+    callId: string,
+  ): Promise<CallParticipantEntity | null> {
     return this.participantRepository.findOne({
-      where: { callId, participantType: 'customer', leftAt: IsNull() }
+      where: { callId, participantType: 'customer', leftAt: IsNull() },
     });
   }
 

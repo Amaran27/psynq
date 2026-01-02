@@ -1,4 +1,13 @@
-import { Controller, Get, Delete, Post, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Delete,
+  Post,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { StorageService } from './storage.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
@@ -8,14 +17,21 @@ export class StorageController {
   constructor(private storageService: StorageService) {}
 
   @Get('recordings/url')
-  async getRecordingUrl(@Query('key') key: string, @Query('expires') expires = 3600, @Req() req: any): Promise<{ url: string }> {
+  async getRecordingUrl(
+    @Query('key') key: string,
+    @Query('expires') expires = 3600,
+    @Req() req: any,
+  ): Promise<{ url: string }> {
     const orgId = req.context?.organizationId || null;
     const url = await this.storageService.getRecordingUrl(key, orgId, +expires);
     return { url };
   }
 
   @Delete('recordings')
-  async deleteRecording(@Query('key') key: string, @Req() req: any): Promise<void> {
+  async deleteRecording(
+    @Query('key') key: string,
+    @Req() req: any,
+  ): Promise<void> {
     const orgId = req.context?.organizationId || null;
     await this.storageService.deleteRecording(key, orgId);
   }

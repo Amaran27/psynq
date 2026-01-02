@@ -1,0 +1,47 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BackendExportsAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::psynq:user/backend-service",
+          "arn:aws:iam::psynq:user/supervisor-export"
+        ]
+      },
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::psynq-exports",
+        "arn:aws:s3:::psynq-exports/*"
+      ]
+    },
+    {
+      "Sid": "TimeLimitedDownload",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::psynq-exports/*"
+      ],
+      "Condition": {
+        "DateLessThan": {
+          "aws:CurrentTime": "2030-12-31T23:59:59Z"
+        },
+        "IpAddress": {
+          "aws:SourceIp": [
+            "172.20.0.0/16",
+            "172.22.0.0/16"
+          ]
+        }
+      }
+    }
+  ]
+}

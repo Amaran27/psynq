@@ -1,10 +1,10 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreatePsGlobalsTable1766324000000 implements MigrationInterface {
-    name = 'CreatePsGlobalsTable1766324000000'
+  name = 'CreatePsGlobalsTable1766324000000';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
             CREATE TABLE "ps_globals" (
                 "id" TEXT PRIMARY KEY,
                 "user_agent" TEXT,
@@ -17,9 +17,9 @@ export class CreatePsGlobalsTable1766324000000 implements MigrationInterface {
                 "default_realm" TEXT
             )
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP TABLE "ps_globals"`);
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TABLE "ps_globals"`);
+  }
 }

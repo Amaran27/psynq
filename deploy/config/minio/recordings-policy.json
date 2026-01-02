@@ -1,0 +1,43 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadCallRecordings",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::psynq-recordings/*"
+      ],
+      "Condition": {
+        "IpAddress": {
+          "aws:SourceIp": [
+            "172.20.0.0/16",
+            "172.22.0.0/16"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "BackendWriteCallRecordings",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::psynq:user/backend-service"
+        ]
+      },
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::psynq-recordings",
+        "arn:aws:s3:::psynq-recordings/*"
+      ]
+    }
+  ]
+}

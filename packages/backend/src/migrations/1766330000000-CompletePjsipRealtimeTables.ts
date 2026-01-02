@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CompletePjsipRealtimeTables1766330000000 implements MigrationInterface {
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // ps_registrations (For outbound trunks to Twilio etc)
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // ps_registrations (For outbound trunks to Twilio etc)
+    await queryRunner.query(`
             CREATE TABLE "ps_registrations" (
                 "id" TEXT PRIMARY KEY,
                 "auth_rejection_permanent" TEXT,
@@ -24,8 +24,8 @@ export class CompletePjsipRealtimeTables1766330000000 implements MigrationInterf
             )
         `);
 
-        // ps_identifies (For matching incoming trunk calls by IP/Header)
-        await queryRunner.query(`
+    // ps_identifies (For matching incoming trunk calls by IP/Header)
+    await queryRunner.query(`
             CREATE TABLE "ps_identifies" (
                 "id" TEXT PRIMARY KEY,
                 "endpoint" TEXT,
@@ -33,10 +33,10 @@ export class CompletePjsipRealtimeTables1766330000000 implements MigrationInterf
                 "match_header" TEXT
             )
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP TABLE "ps_identifies"`);
-        await queryRunner.query(`DROP TABLE "ps_registrations"`);
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TABLE "ps_identifies"`);
+    await queryRunner.query(`DROP TABLE "ps_registrations"`);
+  }
 }

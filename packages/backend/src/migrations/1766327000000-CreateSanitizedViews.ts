@@ -1,17 +1,21 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateSanitizedViews1766327000000 implements MigrationInterface {
-    name = 'CreateSanitizedViews1766327000000'
+  name = 'CreateSanitizedViews1766327000000';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // 1. Rename physical tables to _data
-        await queryRunner.query(`ALTER TABLE "ps_endpoints" RENAME TO "ps_endpoints_data"`);
-        await queryRunner.query(`ALTER TABLE "ps_auths" RENAME TO "ps_auths_data"`);
-        await queryRunner.query(`ALTER TABLE "ps_aors" RENAME TO "ps_aors_data"`);
-        await queryRunner.query(`ALTER TABLE "ps_globals" RENAME TO "ps_globals_data"`);
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // 1. Rename physical tables to _data
+    await queryRunner.query(
+      `ALTER TABLE "ps_endpoints" RENAME TO "ps_endpoints_data"`,
+    );
+    await queryRunner.query(`ALTER TABLE "ps_auths" RENAME TO "ps_auths_data"`);
+    await queryRunner.query(`ALTER TABLE "ps_aors" RENAME TO "ps_aors_data"`);
+    await queryRunner.query(
+      `ALTER TABLE "ps_globals" RENAME TO "ps_globals_data"`,
+    );
 
-        // 2. Create Views that TRIM all string columns
-        await queryRunner.query(`
+    // 2. Create Views that TRIM all string columns
+    await queryRunner.query(`
             CREATE VIEW "ps_endpoints" AS 
             SELECT 
                 TRIM(id) as id,
@@ -43,7 +47,7 @@ export class CreateSanitizedViews1766327000000 implements MigrationInterface {
             FROM "ps_endpoints_data"
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE VIEW "ps_auths" AS 
             SELECT 
                 TRIM(id) as id,
@@ -54,7 +58,7 @@ export class CreateSanitizedViews1766327000000 implements MigrationInterface {
             FROM "ps_auths_data"
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE VIEW "ps_aors" AS 
             SELECT 
                 TRIM(id) as id,
@@ -71,7 +75,7 @@ export class CreateSanitizedViews1766327000000 implements MigrationInterface {
             FROM "ps_aors_data"
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE VIEW "ps_globals" AS 
             SELECT 
                 TRIM(id) as id,
@@ -83,17 +87,21 @@ export class CreateSanitizedViews1766327000000 implements MigrationInterface {
                 contact_expiration_check_interval
             FROM "ps_globals_data"
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP VIEW IF EXISTS "ps_globals"`);
-        await queryRunner.query(`DROP VIEW IF EXISTS "ps_aors"`);
-        await queryRunner.query(`DROP VIEW IF EXISTS "ps_auths"`);
-        await queryRunner.query(`DROP VIEW IF EXISTS "ps_endpoints"`);
-        
-        await queryRunner.query(`ALTER TABLE "ps_endpoints_data" RENAME TO "ps_endpoints"`);
-        await queryRunner.query(`ALTER TABLE "ps_auths_data" RENAME TO "ps_auths"`);
-        await queryRunner.query(`ALTER TABLE "ps_aors_data" RENAME TO "ps_aors"`);
-        await queryRunner.query(`ALTER TABLE "ps_globals_data" RENAME TO "ps_globals"`);
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP VIEW IF EXISTS "ps_globals"`);
+    await queryRunner.query(`DROP VIEW IF EXISTS "ps_aors"`);
+    await queryRunner.query(`DROP VIEW IF EXISTS "ps_auths"`);
+    await queryRunner.query(`DROP VIEW IF EXISTS "ps_endpoints"`);
+
+    await queryRunner.query(
+      `ALTER TABLE "ps_endpoints_data" RENAME TO "ps_endpoints"`,
+    );
+    await queryRunner.query(`ALTER TABLE "ps_auths_data" RENAME TO "ps_auths"`);
+    await queryRunner.query(`ALTER TABLE "ps_aors_data" RENAME TO "ps_aors"`);
+    await queryRunner.query(
+      `ALTER TABLE "ps_globals_data" RENAME TO "ps_globals"`,
+    );
+  }
 }

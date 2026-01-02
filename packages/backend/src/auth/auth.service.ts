@@ -1,10 +1,16 @@
-import { Injectable, ConflictException, UnauthorizedException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import { hash, compare, genSalt } from 'bcrypt';
 import { UserEntity, UserRole } from '../entities/user.entity';
-import { CreateUserDto } from './dto/create-user.dto';
+import { RegisterUserDto } from './dto/register-user.dto';
 import { AgentStatus } from '@psynq/core';
 import { CallService } from '../services/call.service';
 
@@ -23,16 +29,18 @@ export class AuthService {
    * @param createUserDto - The user data for registration.
    * @returns The newly created user entity (without password).
    */
-  async register(createUserDto: CreateUserDto): Promise<Omit<UserEntity, 'password'>> {
-    const { username, password } = createUserDto;
+  async register(
+    registerUserDto: RegisterUserDto,
+  ): Promise<Omit<UserEntity, 'password'>> {
+    const { username, password } = registerUserDto;
 
     const existingUser = await this.userRepository.findOneBy({ username });
     if (existingUser) {
       throw new ConflictException('Username already exists');
     }
 
-    const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const salt = await genSalt();
+    const hashedPassword = await hash(password, salt);
 
     const newUser = this.userRepository.create({
       username,
@@ -41,7 +49,8 @@ export class AuthService {
     });
 
     const savedUser = await this.userRepository.save(newUser);
-    const { password: _, ...result } = savedUser;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _pw, ...result } = savedUser;
     return result;
   }
 
@@ -51,10 +60,14 @@ export class AuthService {
    * @param pass - The user's plaintext password.
    * @returns The user entity if validation is successful, otherwise null.
    */
-  async validateUser(username: string, pass: string): Promise<Omit<UserEntity, 'password'> | null> {
+  async validateUser(
+    username: string,
+    pass: string,
+  ): Promise<Omit<UserEntity, 'password'> | null> {
     const user = await this.userRepository.findOneBy({ username });
-    if (user && (await bcrypt.compare(pass, user.password))) {
-      const { password, ...result } = user;
+    if (user && (await compare(pass, user.password))) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _pw, ...result } = user;
       return result;
     }
     return null;
@@ -66,11 +79,11 @@ export class AuthService {
    * @returns An object containing the access token and refresh token.
    */
   async login(user: Omit<UserEntity, 'password'>) {
-    const payload = { 
-      username: user.username, 
-      sub: user.id, 
+    const payload = {
+      username: user.username,
+      sub: user.id,
       roles: user.roles,
-      orgId: user.organizationId 
+      orgId: user.organizationId,
     };
 
     // Access token - short-lived (1 day)
@@ -98,7 +111,7 @@ export class AuthService {
     try {
       const payload = this.jwtService.verify(refreshToken);
       const user = await this.userRepository.findOneBy({ id: payload.sub });
-      
+
       if (!user) {
         throw new UnauthorizedException('Invalid refresh token');
       }
@@ -132,7 +145,10 @@ export class AuthService {
    * @param status - The new status to set.
    */
   async updateStatus(userId: string, status: AgentStatus): Promise<UserEntity> {
-    await this.userRepository.update(userId, { status, lastStatusChangedAt: new Date() });
+    await this.userRepository.update(userId, {
+      status,
+      lastStatusChangedAt: new Date(),
+    });
     const updatedUser = await this.userRepository.findOneBy({ id: userId });
 
     if (!updatedUser) {

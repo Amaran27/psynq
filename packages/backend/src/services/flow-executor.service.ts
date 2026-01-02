@@ -7,11 +7,17 @@ export class FlowExecutorService {
   private readonly logger = new Logger(FlowExecutorService.name);
 
   constructor(
-    @Inject('TELEPHONY_PROVIDER') private readonly telephonyProvider: TelephonyPort,
+    @Inject('TELEPHONY_PROVIDER')
+    private readonly telephonyProvider: TelephonyPort,
   ) {}
 
-  async executeStep(orgId: string, callId: string, flow: FlowEntity, stepId: string) {
-    const step = flow.definition.nodes.find(n => n.id === stepId);
+  async executeStep(
+    orgId: string,
+    callId: string,
+    flow: FlowEntity,
+    stepId: string,
+  ) {
+    const step = flow.definition.nodes.find((n) => n.id === stepId);
     if (!step) {
       this.logger.warn(`Step ${stepId} not found in flow ${flow.id}`);
       return;
@@ -35,7 +41,7 @@ export class FlowExecutorService {
         await this.telephonyProvider.gatherDigits(orgId, callId, {
           maxDigits: step.params.maxDigits || 1,
           timeout: step.params.timeout || 5000,
-          finishOnKey: step.params.finishOnKey || '#'
+          finishOnKey: step.params.finishOnKey || '#',
         });
         // We don't call next here; we wait for the 'digits_gathered' event
         break;

@@ -23,6 +23,7 @@ import { SettingsController } from './settings.controller';
 import { SystemSettingsController } from './system-settings.controller';
 import { SettingsModule } from './modules/settings.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { UserModule } from './modules/user/user.module';
 import { OrganizationEntity } from './entities/organization.entity';
 import { QueueEntity } from './entities/queue.entity';
 import { FlowEntity } from './entities/flow.entity';
@@ -34,7 +35,12 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      envFilePath: ['.env', '.env.development', '.env.production', '../../.env'],
+      envFilePath: [
+        '.env',
+        '.env.development',
+        '.env.production',
+        '../../.env',
+      ],
       isGlobal: true,
     }),
     AppConfigModule,
@@ -45,12 +51,25 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
         host: configService.get<string>('DB_HOST') || 'localhost',
         port: parseInt(configService.get<string>('DB_PORT') || '5432', 10),
         username: configService.get<string>('DB_USERNAME') || 'psynq_user',
-        password: configService.get<string>('DB_PASSWORD') || 'mysecretpassword',
+        password:
+          configService.get<string>('DB_PASSWORD') || 'mysecretpassword',
         database: configService.get<string>('DB_DATABASE') || 'psynq_db',
-        entities: [CallEntity, UserEntity, CallParticipantEntity, RecordingEntity, SettingEntity, OrganizationEntity, QueueEntity, FlowEntity, WalletEntity, RateEntity],
+        entities: [
+          CallEntity,
+          UserEntity,
+          CallParticipantEntity,
+          RecordingEntity,
+          SettingEntity,
+          OrganizationEntity,
+          QueueEntity,
+          FlowEntity,
+          WalletEntity,
+          RateEntity,
+        ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
-        migrationsRun: configService.get<string>('RUN_MIGRATIONS_ON_START') === 'true',
+        migrationsRun:
+          configService.get<string>('RUN_MIGRATIONS_ON_START') === 'true',
       }),
       inject: [ConfigService],
     }),
@@ -65,6 +84,7 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
     WebhookModule,
     SettingsModule,
     OrganizationModule,
+    UserModule,
     // RecordingsModule, // Temporarily disabled - missing minio module
   ],
   controllers: [AppController, SettingsController, SystemSettingsController],

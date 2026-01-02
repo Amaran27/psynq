@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateExtensionsData1766333000000 implements MigrationInterface {
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // 1. Create Data Table
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // 1. Create Data Table
+    await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "extensions_data" (
                 "id" SERIAL PRIMARY KEY,
                 "context" TEXT NOT NULL,
@@ -14,9 +14,9 @@ export class CreateExtensionsData1766333000000 implements MigrationInterface {
             )
         `);
 
-        // 2. Create Sanitized View
-        await queryRunner.query(`DROP VIEW IF EXISTS extensions`);
-        await queryRunner.query(`
+    // 2. Create Sanitized View
+    await queryRunner.query(`DROP VIEW IF EXISTS extensions`);
+    await queryRunner.query(`
             CREATE VIEW extensions AS 
             SELECT 
                 "id",
@@ -28,15 +28,15 @@ export class CreateExtensionsData1766333000000 implements MigrationInterface {
             FROM extensions_data
         `);
 
-        // 3. Seed basic routing
-        await queryRunner.query(`
+    // 3. Seed basic routing
+    await queryRunner.query(`
             INSERT INTO extensions_data (context, exten, priority, app, appdata)
             VALUES ('from-webrtc', '_X.', 1, 'Stasis', 'psynq-app')
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP VIEW IF EXISTS extensions`);
-        await queryRunner.query(`DROP TABLE IF EXISTS extensions_data`);
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP VIEW IF EXISTS extensions`);
+    await queryRunner.query(`DROP TABLE IF EXISTS extensions_data`);
+  }
 }

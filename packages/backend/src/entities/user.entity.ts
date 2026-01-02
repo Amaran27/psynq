@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { AgentStatus } from '@psynq/core';
 import { OrganizationEntity } from './organization.entity';
 
@@ -17,8 +25,20 @@ export class UserEntity {
   @Column({ unique: true })
   username: string;
 
+  @Column({ unique: true, nullable: true })
+  email?: string;
+
   @Column()
   password?: string;
+
+  @Column({ nullable: true })
+  firstName?: string;
+
+  @Column({ nullable: true })
+  lastName?: string;
+
+  @Column({ nullable: true })
+  phone?: string;
 
   @Column({ nullable: true })
   organizationId: string;
@@ -32,6 +52,13 @@ export class UserEntity {
     default: [UserRole.AGENT],
   })
   roles: UserRole[];
+
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    nullable: true,
+  })
+  primaryRole?: UserRole;
 
   @Column({
     type: 'enum',

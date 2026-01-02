@@ -94,6 +94,7 @@ playwright/.cache/
 
 # Deployment
 # Only ignore generated files or secrets in deploy, not the infra code
+deploy/secrets/**
 **/asterisk-config/odbc.ini
 **/asterisk-config/res_odbc.conf
 **/asterisk-config/ari.conf
@@ -101,3 +102,10 @@ playwright/.cache/
 # Test credentials
 packages/web/login.json
 packages/web/refresh.json
+# Archived exports and generated scripts
+.archive/
+openproject_exports/
+scripts/generate_*.py
+scripts/import_*.py
+scripts/push_*.py
+scripts/create_openproject_workpackages.py

@@ -18,8 +18,10 @@ export class StorageRouterAdapter implements StoragePort {
   ) {}
 
   private async getAdapter(orgId: string | null): Promise<StoragePort> {
-    const provider = await this.settingsService.getSetting(orgId, 'storage.provider') || 'local';
-    
+    const provider =
+      (await this.settingsService.getSetting(orgId, 'storage.provider')) ||
+      'local';
+
     switch (provider.toLowerCase()) {
       case 's3':
         return this.s3Adapter;
@@ -31,12 +33,23 @@ export class StorageRouterAdapter implements StoragePort {
     }
   }
 
-  async upload(orgId: string | null, key: string, stream: Readable, contentType: string, metadata?: Record<string, string>): Promise<void> {
+  async upload(
+    orgId: string | null,
+    key: string,
+    stream: Readable,
+    contentType: string,
+    metadata?: Record<string, string>,
+  ): Promise<void> {
     const adapter = await this.getAdapter(orgId);
     return adapter.upload(orgId, key, stream, contentType, metadata);
   }
 
-  async getSignedUrl(orgId: string | null, key: string, expiresInSeconds: number, operation: 'GET' | 'PUT'): Promise<string> {
+  async getSignedUrl(
+    orgId: string | null,
+    key: string,
+    expiresInSeconds: number,
+    operation: 'GET' | 'PUT',
+  ): Promise<string> {
     const adapter = await this.getAdapter(orgId);
     return adapter.getSignedUrl(orgId, key, expiresInSeconds, operation);
   }
@@ -56,7 +69,11 @@ export class StorageRouterAdapter implements StoragePort {
     return adapter.healthCheck(orgId);
   }
 
-  async applyLifecyclePolicy(orgId: string | null, prefix: string, olderThanDays: number): Promise<void> {
+  async applyLifecyclePolicy(
+    orgId: string | null,
+    prefix: string,
+    olderThanDays: number,
+  ): Promise<void> {
     const adapter = await this.getAdapter(orgId);
     return adapter.applyLifecyclePolicy(orgId, prefix, olderThanDays);
   }

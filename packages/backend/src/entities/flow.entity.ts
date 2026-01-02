@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { OrganizationEntity } from './organization.entity';
 
 export enum FlowNodeType {
@@ -7,7 +15,7 @@ export enum FlowNodeType {
   DIAL_QUEUE = 'dial_queue',
   SAY = 'say',
   HANGUP = 'hangup',
-  BRANCH = 'branch'
+  BRANCH = 'branch',
 }
 
 export interface FlowStep {

@@ -9,11 +9,16 @@ export class LocalEventBusAdapter implements EventBusPort {
   constructor(private eventEmitter: EventEmitter2) {}
 
   async publish(event: PsynqEvent): Promise<void> {
-    this.logger.debug(`Publishing event: ${event.type} for org ${event.organizationId}`);
+    this.logger.debug(
+      `Publishing event: ${event.type} for org ${event.organizationId}`,
+    );
     this.eventEmitter.emit(event.type, event);
   }
 
-  async subscribe(pattern: string, callback: (event: PsynqEvent) => void): Promise<void> {
+  async subscribe(
+    pattern: string,
+    callback: (event: PsynqEvent) => void,
+  ): Promise<void> {
     this.eventEmitter.on(pattern, callback);
   }
 }

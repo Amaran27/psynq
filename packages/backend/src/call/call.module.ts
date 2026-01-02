@@ -50,7 +50,7 @@ import { ConfigModule as AppConfigModule } from '../config/config.module';
   ],
   controllers: [CallController, HealthController, TelephonyController],
   providers: [
-    CallService, 
+    CallService,
     CallParticipantService,
     AgentStateService,
     CallOrchestratorService,
@@ -59,12 +59,20 @@ import { ConfigModule as AppConfigModule } from '../config/config.module';
     FlowExecutorService,
     BillingService,
     IntelligenceService,
-    CallGateway, 
+    CallGateway,
     {
       provide: 'TELEPHONY_PROVIDER',
       useClass: AsteriskAdapter,
-    }
+    },
   ],
-  exports: [CallService, AgentStateService, QueueService, FlowService, FlowExecutorService, BillingService, IntelligenceService],
+  exports: [
+    CallService,
+    AgentStateService,
+    QueueService,
+    FlowService,
+    FlowExecutorService,
+    BillingService,
+    IntelligenceService,
+  ],
 })
 export class CallModule {}

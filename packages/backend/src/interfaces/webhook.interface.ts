@@ -20,7 +20,7 @@ export interface WebhookAdapter {
    * Processes a webhook from a provider and returns a standardized event
    */
   processWebhook(payload: any): Promise<StandardWebhookEvent | null>;
-  
+
   /**
    * Generates the appropriate response for the webhook
    */

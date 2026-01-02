@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 import { CallEntity } from './call.entity';
 
 @Entity('call_participants')
@@ -15,7 +23,7 @@ export class CallParticipantEntity {
   @Column({
     type: 'enum',
     enum: ['agent', 'customer', 'supervisor'],
-    name: 'participant_type'
+    name: 'participant_type',
   })
   participantType: 'agent' | 'customer' | 'supervisor';
 
@@ -43,6 +51,6 @@ export class CallParticipantEntity {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
-  @ManyToOne(() => CallEntity, call => call.participants)
+  @ManyToOne(() => CallEntity, (call) => call.participants)
   call: CallEntity;
 }

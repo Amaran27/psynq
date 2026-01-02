@@ -1,4 +1,13 @@
-import { Entity, PrimaryColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { CallDirection, CallState } from '@psynq/core';
 import { CallParticipantEntity } from './call-participant.entity';
 import { OrganizationEntity } from './organization.entity';
@@ -59,6 +68,6 @@ export class CallEntity {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @OneToMany(() => CallParticipantEntity, participant => participant.call)
+  @OneToMany(() => CallParticipantEntity, (participant) => participant.call)
   participants: CallParticipantEntity[];
 }

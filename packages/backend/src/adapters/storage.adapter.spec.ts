@@ -38,7 +38,13 @@ describe('MinioStorageAdapter', () => {
 
     await adapter.upload('test.wav', stream, 'audio/wav');
 
-    expect(mockClient.putObject).toHaveBeenCalledWith('testbucket', 'test.wav', stream, undefined, { 'Content-Type': 'audio/wav' });
+    expect(mockClient.putObject).toHaveBeenCalledWith(
+      'testbucket',
+      'test.wav',
+      stream,
+      undefined,
+      { 'Content-Type': 'audio/wav' },
+    );
   });
 
   it('should get signed URL for GET', async () => {
@@ -47,7 +53,11 @@ describe('MinioStorageAdapter', () => {
     const url = await adapter.getSignedUrl('test.wav', 3600, 'GET');
 
     expect(url).toBe('http://signed-url');
-    expect(mockClient.presignedGetObject).toHaveBeenCalledWith('testbucket', 'test.wav', 3600);
+    expect(mockClient.presignedGetObject).toHaveBeenCalledWith(
+      'testbucket',
+      'test.wav',
+      3600,
+    );
   });
 
   it('should delete a file', async () => {
@@ -55,11 +65,17 @@ describe('MinioStorageAdapter', () => {
 
     await adapter.delete('test.wav');
 
-    expect(mockClient.removeObject).toHaveBeenCalledWith('testbucket', 'test.wav');
+    expect(mockClient.removeObject).toHaveBeenCalledWith(
+      'testbucket',
+      'test.wav',
+    );
   });
 
   it('should list files', async () => {
-    mockClient.listObjectsV2.mockResolvedValue([{ name: 'file1.wav' }, { name: 'file2.wav' }]);
+    mockClient.listObjectsV2.mockResolvedValue([
+      { name: 'file1.wav' },
+      { name: 'file2.wav' },
+    ]);
 
     const files = await adapter.list('recordings/');
 
@@ -77,11 +93,15 @@ describe('MinioStorageAdapter', () => {
   it('should apply lifecycle policy', async () => {
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 40);
-    mockClient.listObjectsV2.mockResolvedValue([{ name: 'old.wav', lastModified: oldDate }]);
+    mockClient.listObjectsV2.mockResolvedValue([
+      { name: 'old.wav', lastModified: oldDate },
+    ]);
     mockClient.removeObjects.mockResolvedValue(undefined);
 
     await adapter.applyLifecyclePolicy('recordings/', 30);
 
-    expect(mockClient.removeObjects).toHaveBeenCalledWith('testbucket', ['old.wav']);
+    expect(mockClient.removeObjects).toHaveBeenCalledWith('testbucket', [
+      'old.wav',
+    ]);
   });
 });

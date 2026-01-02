@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TranscriptionPort, TranscriptionEvent } from '../../ports/transcription.port';
+import {
+  TranscriptionPort,
+  TranscriptionEvent,
+} from '../../ports/transcription.port';
 import { createClient, LiveTranscriptionEvents } from '@deepgram/sdk';
 import { SettingsService } from '../../services/settings.service';
 
@@ -10,9 +13,17 @@ export class DeepgramAdapter implements TranscriptionPort {
 
   constructor(private readonly settingsService: SettingsService) {}
 
-  async startTranscription(orgId: string, callId: string, callback: (event: TranscriptionEvent) => void): Promise<void> {
+  async startTranscription(
+    orgId: string,
+    callId: string,
+    callback: (event: TranscriptionEvent) => void,
+  ): Promise<void> {
     try {
-      const config = await this.settingsService.getSetting(orgId, 'intelligence.deepgram.config', true);
+      const config = await this.settingsService.getSetting(
+        orgId,
+        'intelligence.deepgram.config',
+        true,
+      );
       if (!config?.apiKey) throw new Error('Deepgram API Key missing');
 
       const deepgram = createClient(config.apiKey);
@@ -29,7 +40,7 @@ export class DeepgramAdapter implements TranscriptionPort {
             callId,
             text,
             isFinal: data.is_final,
-            confidence: data.channel.alternatives[0].confidence
+            confidence: data.channel.alternatives[0].confidence,
           });
         }
       });

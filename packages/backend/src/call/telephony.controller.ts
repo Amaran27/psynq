@@ -5,7 +5,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 @Controller('telephony')
 export class TelephonyController {
   constructor(
-    @Inject('TELEPHONY_PROVIDER') private readonly telephonyProvider: TelephonyPort
+    @Inject('TELEPHONY_PROVIDER')
+    private readonly telephonyProvider: TelephonyPort,
   ) {}
 
   @UseGuards(JwtAuthGuard)

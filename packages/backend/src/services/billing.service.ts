@@ -16,7 +16,9 @@ export class BillingService {
   ) {}
 
   async getBalance(orgId: string): Promise<number> {
-    const wallet = await this.walletRepository.findOne({ where: { organizationId: orgId } });
+    const wallet = await this.walletRepository.findOne({
+      where: { organizationId: orgId },
+    });
     return wallet ? Number(wallet.balance) : 0;
   }
 
@@ -31,19 +33,27 @@ export class BillingService {
     // Basic LCR (Least Cost Routing) style prefix match
     const rates = await this.rateRepository.find();
     const sortedRates = rates.sort((a, b) => b.prefix.length - a.prefix.length); // Longest match first
-    
-    const match = sortedRates.find(r => to.startsWith(r.prefix));
+
+    const match = sortedRates.find((r) => to.startsWith(r.prefix));
     return match ? Number(match.costPerSecond) : 0.001; // Default fallback rate
   }
 
-  async chargeForCall(orgId: string, durationSeconds: number, rate: number): Promise<void> {
+  async chargeForCall(
+    orgId: string,
+    durationSeconds: number,
+    rate: number,
+  ): Promise<void> {
     const cost = durationSeconds * rate;
-    const wallet = await this.walletRepository.findOne({ where: { organizationId: orgId } });
-    
+    const wallet = await this.walletRepository.findOne({
+      where: { organizationId: orgId },
+    });
+
     if (wallet) {
       wallet.balance = Number(wallet.balance) - cost;
       await this.walletRepository.save(wallet);
-      this.logger.log(`Charged org ${orgId} amount ${cost} for ${durationSeconds}s call.`);
+      this.logger.log(
+        `Charged org ${orgId} amount ${cost} for ${durationSeconds}s call.`,
+      );
     }
   }
 }

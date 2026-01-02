@@ -1,14 +1,14 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class CreateAsteriskRealtimeTables1766320000000 implements MigrationInterface {
-    name = 'CreateAsteriskRealtimeTables1766320000000'
+  name = 'CreateAsteriskRealtimeTables1766320000000';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Asterisk Realtime Architecture - PJSIP Tables
-        // These schemas are standard for Asterisk res_odbc
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Asterisk Realtime Architecture - PJSIP Tables
+    // These schemas are standard for Asterisk res_odbc
 
-        // ps_endpoints
-        await queryRunner.query(`
+    // ps_endpoints
+    await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "ps_endpoints" (
                 "id" varchar(40) NOT NULL,
                 "transport" varchar(40),
@@ -151,10 +151,12 @@ export class CreateAsteriskRealtimeTables1766320000000 implements MigrationInter
                 PRIMARY KEY ("id")
             )
         `);
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "ps_endpoints_id" ON "ps_endpoints" ("id")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "ps_endpoints_id" ON "ps_endpoints" ("id")`,
+    );
 
-        // ps_auths
-        await queryRunner.query(`
+    // ps_auths
+    await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "ps_auths" (
                 "id" varchar(40) NOT NULL,
                 "auth_type" varchar(40),
@@ -169,10 +171,12 @@ export class CreateAsteriskRealtimeTables1766320000000 implements MigrationInter
                 PRIMARY KEY ("id")
             )
         `);
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "ps_auths_id" ON "ps_auths" ("id")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "ps_auths_id" ON "ps_auths" ("id")`,
+    );
 
-        // ps_aors
-        await queryRunner.query(`
+    // ps_aors
+    await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "ps_aors" (
                 "id" varchar(40) NOT NULL,
                 "contact" varchar(255),
@@ -191,10 +195,12 @@ export class CreateAsteriskRealtimeTables1766320000000 implements MigrationInter
                 PRIMARY KEY ("id")
             )
         `);
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "ps_aors_id" ON "ps_aors" ("id")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "ps_aors_id" ON "ps_aors" ("id")`,
+    );
 
-        // ps_contacts (Dynamic - for registrations)
-        await queryRunner.query(`
+    // ps_contacts (Dynamic - for registrations)
+    await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "ps_contacts" (
                 "id" varchar(255) NOT NULL,
                 "uri" varchar(255),
@@ -213,25 +219,31 @@ export class CreateAsteriskRealtimeTables1766320000000 implements MigrationInter
                 PRIMARY KEY ("id")
             )
         `);
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "ps_contacts_id" ON "ps_contacts" ("id")`);
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "ps_contacts_qualifyfreq_exp" ON "ps_contacts" ("qualify_frequency", "expiration_time")`);
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "ps_contacts_id" ON "ps_contacts" ("id")`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "ps_contacts_qualifyfreq_exp" ON "ps_contacts" ("qualify_frequency", "expiration_time")`,
+    );
 
-        // ps_domain_aliases
-        await queryRunner.query(`
+    // ps_domain_aliases
+    await queryRunner.query(`
             CREATE TABLE IF NOT EXISTS "ps_domain_aliases" (
                 "id" varchar(40) NOT NULL,
                 "domain" varchar(40),
                 PRIMARY KEY ("id")
             )
         `);
-        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "ps_domain_aliases_id" ON "ps_domain_aliases" ("id")`);
-    }
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "ps_domain_aliases_id" ON "ps_domain_aliases" ("id")`,
+    );
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_domain_aliases"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_contacts"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_aors"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_auths"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_endpoints"`);
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_domain_aliases"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_contacts"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_aors"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_auths"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_endpoints"`);
+  }
 }

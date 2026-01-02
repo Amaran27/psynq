@@ -1,0 +1,60 @@
+# Psitrix Psynq - PostgreSQL Backup Cron Jobs
+# Phase 1 Infrastructure - Automated Backup Scheduling
+
+# Environment Variables
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# ============================================
+# DAILY BACKUPS
+# ============================================
+
+# Full backup daily at 2:00 AM
+0 2 * * * cd /app && ./deploy/db/backup/backup-postgres.sh >> /var/log/psynq-backup.log 2>&1
+
+# ============================================
+# HOURLY CHECKS
+# ============================================
+
+# Check PostgreSQL backup status every hour
+0 * * * * /usr/bin/docker exec psynq_postgres_primary pg_isready -U psynq_admin || echo "PostgreSQL not ready" | mail -s "PostgreSQL Health Check Failed" admin@psynq.dev
+
+# Check disk space every 6 hours
+0 */6 * * * df -h /backups | awk 'NR==2 && $5+0 > 80 { print "Disk space critical: " $5 }'
+
+# ============================================
+# WEEKLY TASKS
+# ============================================
+
+# Cleanup old WAL archives on Sundays at 3 AM
+0 3 * * 0 /usr/bin/find /var/lib/postgresql/archive -name "*.gz" -mtime +7 -delete
+
+# Backup verification on Sundays at 4 AM
+0 4 * * 0 cd /app && ./deploy/db/backup/verify-backup.sh >> /var/log/psynq-backup-verify.log 2>&1
+
+# ============================================
+# MONTHLY TASKS
+# ============================================
+
+# Full backup integrity check on 1st of month at 5 AM
+0 5 1 * * cd /app && for backup in /backups/base/*.tar.gz; do gunzip -t "$backup" || echo "Corrupt backup: $backup" | mail -s "Backup Integrity Alert" admin@psynq.dev; done
+
+# ============================================
+# NOTES
+# ============================================
+
+# 1. Install these cron jobs:
+#    crontab -e
+#    (paste this file content)
+#
+# 2. Monitor logs:
+#    tail -f /var/log/psynq-backup.log
+#
+# 3. View scheduled jobs:
+#    crontab -l
+#
+# 4. Adjust schedules based on:
+#    - Database size
+#    - Backup window
+#    - Retention policy
+#    - RPO/RTO requirements

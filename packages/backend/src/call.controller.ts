@@ -1,8 +1,21 @@
-import { Controller, Get, Post, Put, Body, Param, NotFoundException, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  NotFoundException,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { CallService } from './services/call.service';
 import { CreateCallDto, CallResponseDto, CallActionDto } from './dtos/call.dto';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { SupervisorControlOptions, CallParticipant } from './interfaces/call-participant.interface';
+import {
+  SupervisorControlOptions,
+  CallParticipant,
+} from './interfaces/call-participant.interface';
 
 @Controller('calls')
 @UseGuards(JwtAuthGuard)
@@ -13,7 +26,10 @@ export class CallController {
    * Create a new outbound call
    */
   @Post()
-  async createCall(@Body() createCallDto: CreateCallDto, @Req() req): Promise<CallResponseDto> {
+  async createCall(
+    @Body() createCallDto: CreateCallDto,
+    @Req() req,
+  ): Promise<CallResponseDto> {
     const agentId = req.user?.userId || req.user?.id || createCallDto.agentId;
     return await this.callService.createCall(createCallDto, agentId);
   }
@@ -74,17 +90,23 @@ export class CallController {
    */
   @Post(':id/supervisor/inject')
   async injectSupervisor(
-    @Param('id') callId: string, 
-    @Body() body: { supervisorId: string; options?: SupervisorControlOptions }
+    @Param('id') callId: string,
+    @Body() body: { supervisorId: string; options?: SupervisorControlOptions },
   ): Promise<CallParticipant> {
-    return await this.callService.injectSupervisor(callId, body.supervisorId, body.options);
+    return await this.callService.injectSupervisor(
+      callId,
+      body.supervisorId,
+      body.options,
+    );
   }
 
   /**
    * Unmute (barge-in) the supervisor so they can speak
    */
   @Post(':id/supervisor/unmute')
-  async supervisorUnmute(@Param('id') callId: string): Promise<CallResponseDto> {
+  async supervisorUnmute(
+    @Param('id') callId: string,
+  ): Promise<CallResponseDto> {
     return await this.callService.supervisorUnmute(callId);
   }
 

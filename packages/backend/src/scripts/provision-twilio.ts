@@ -16,10 +16,12 @@ async function provision() {
   const TWILIO_TRUNK_ID = process.env.TWILIO_TRUNK_ID || 'twilio-trunk';
 
   if (!TWILIO_DOMAIN || !TWILIO_USER || !TWILIO_PASS) {
-    console.error('Missing required environment variables: TWILIO_DOMAIN, TWILIO_USER, TWILIO_PASS');
+    console.error(
+      'Missing required environment variables: TWILIO_DOMAIN, TWILIO_USER, TWILIO_PASS',
+    );
     process.exit(1);
   }
-  
+
   await AppDataSource.initialize();
   const qr = AppDataSource.createQueryRunner();
 
@@ -40,21 +42,28 @@ async function provision() {
   `);
 
   // 3. Create AOR (Address of Record) - Points to Twilio's server
-  await qr.query(`
+  await qr.query(
+    `
     INSERT INTO ps_aors_data (id, contact, qualify_frequency)
     VALUES ($1, $2, 30)
     ON CONFLICT (id) DO UPDATE SET contact = $2
-  `, [TWILIO_TRUNK_ID, `sip:${TWILIO_DOMAIN}`]);
+  `,
+    [TWILIO_TRUNK_ID, `sip:${TWILIO_DOMAIN}`],
+  );
 
   // 4. Create Auth - Your Twilio SIP Credentials
-  await qr.query(`
+  await qr.query(
+    `
     INSERT INTO ps_auths_data (id, auth_type, username, password)
     VALUES ($1, 'userpass', $2, $3)
     ON CONFLICT (id) DO UPDATE SET username = $2, password = $3
-  `, [`${TWILIO_TRUNK_ID}-auth`, TWILIO_USER, TWILIO_PASS]);
+  `,
+    [`${TWILIO_TRUNK_ID}-auth`, TWILIO_USER, TWILIO_PASS],
+  );
 
   // 5. Create Endpoint - The bridge between Asterisk and Twilio
-  await qr.query(`
+  await qr.query(
+    `
     INSERT INTO ps_endpoints_data (
         id, transport, aors, outbound_auth, context, 
         disallow, allow, rewrite_contact, force_rport, 
@@ -65,16 +74,27 @@ async function provision() {
         'yes', $4, $5
     )
     ON CONFLICT (id) DO UPDATE SET outbound_auth = $3
-  `, [TWILIO_TRUNK_ID, TWILIO_TRUNK_ID, `${TWILIO_TRUNK_ID}-auth`, TWILIO_USER, TWILIO_DOMAIN]);
+  `,
+    [
+      TWILIO_TRUNK_ID,
+      TWILIO_TRUNK_ID,
+      `${TWILIO_TRUNK_ID}-auth`,
+      TWILIO_USER,
+      TWILIO_DOMAIN,
+    ],
+  );
 
   // 6. Create Identify - Crucial for INBOUND calls
   // This matches calls coming from Twilio's IP ranges to the 'twilio-trunk' endpoint
   // Note: Twilio uses many IPs, but usually matching the domain works for basic setups
-  await qr.query(`
+  await qr.query(
+    `
     INSERT INTO ps_identifies_data (id, endpoint, match)
     VALUES ($1, $2, $3)
     ON CONFLICT (id) DO UPDATE SET match = $3
-  `, [`${TWILIO_TRUNK_ID}-identify`, TWILIO_TRUNK_ID, TWILIO_DOMAIN]);
+  `,
+    [`${TWILIO_TRUNK_ID}-identify`, TWILIO_TRUNK_ID, TWILIO_DOMAIN],
+  );
 
   console.log('Twilio Trunk Provisioned successfully.');
   await AppDataSource.destroy();

@@ -15,8 +15,10 @@ export class CallOrchestratorService implements OnModuleInit {
 
   constructor(
     @Inject('EVENT_BUS') private readonly eventBus: EventBusPort,
-    @Inject('TELEPHONY_PROVIDER') private readonly telephonyProvider: TelephonyPort,
-    @Inject('TRANSCRIPTION_PROVIDER') private readonly transcriptionProvider: TranscriptionPort,
+    @Inject('TELEPHONY_PROVIDER')
+    private readonly telephonyProvider: TelephonyPort,
+    @Inject('TRANSCRIPTION_PROVIDER')
+    private readonly transcriptionProvider: TranscriptionPort,
     private readonly agentStateService: AgentStateService,
     private readonly queueService: QueueService,
     private readonly flowService: FlowService,
@@ -25,10 +27,18 @@ export class CallOrchestratorService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.eventBus.subscribe('telephony.call_received', (event) => this.handleInboundCall(event));
-    await this.eventBus.subscribe('telephony.channel_entered', (event) => this.handleChannelEntered(event));
-    await this.eventBus.subscribe('telephony.channel_hungup', (event) => this.handleChannelHungup(event));
-    await this.eventBus.subscribe('telephony.dtmf_received', (event) => this.handleDtmfReceived(event));
+    await this.eventBus.subscribe('telephony.call_received', (event) =>
+      this.handleInboundCall(event),
+    );
+    await this.eventBus.subscribe('telephony.channel_entered', (event) =>
+      this.handleChannelEntered(event),
+    );
+    await this.eventBus.subscribe('telephony.channel_hungup', (event) =>
+      this.handleChannelHungup(event),
+    );
+    await this.eventBus.subscribe('telephony.dtmf_received', (event) =>
+      this.handleDtmfReceived(event),
+    );
   }
 
   /**
@@ -38,21 +48,33 @@ export class CallOrchestratorService implements OnModuleInit {
     const call = event.payload;
     const orgId = event.organizationId;
 
-    this.logger.log(`Inbound Call ${call.id} for org ${orgId}. Executing flow...`);
+    this.logger.log(
+      `Inbound Call ${call.id} for org ${orgId}. Executing flow...`,
+    );
 
     const flow = await this.flowService.getDefaultFlowForOrg(orgId);
     if (flow) {
-      await this.flowExecutorService.executeStep(orgId, call.id, flow, flow.definition.startNode);
+      await this.flowExecutorService.executeStep(
+        orgId,
+        call.id,
+        flow,
+        flow.definition.startNode,
+      );
     } else {
       // Fallback to direct queue routing if no flow defined
-      this.logger.warn(`No flow defined for org ${orgId}. Routing to default queue.`);
+      this.logger.warn(
+        `No flow defined for org ${orgId}. Routing to default queue.`,
+      );
       await this.routeToQueue(orgId, call);
     }
   }
 
   private async routeToQueue(orgId: string, call: any) {
     const queue = await this.queueService.findQueueForNumber(orgId, call.to);
-    const agent = await this.agentStateService.getBestAvailableAgent(orgId, queue?.requiredSkills || []);
+    const agent = await this.agentStateService.getBestAvailableAgent(
+      orgId,
+      queue?.requiredSkills || [],
+    );
 
     if (agent) {
       await this.telephonyProvider.createCall({ ...call, agentId: agent.id });
@@ -62,7 +84,9 @@ export class CallOrchestratorService implements OnModuleInit {
 
   private async handleDtmfReceived(event: PsynqEvent) {
     // Logic to resume flow execution based on digits
-    this.logger.debug(`DTMF Received: ${event.payload.digit} for Call: ${event.payload.callId}`);
+    this.logger.debug(
+      `DTMF Received: ${event.payload.digit} for Call: ${event.payload.callId}`,
+    );
   }
 
   private async handleChannelEntered(event: PsynqEvent) {
@@ -73,20 +97,38 @@ export class CallOrchestratorService implements OnModuleInit {
       await this.telephonyProvider.joinBridge(orgId, bridgeId, channelId);
       if (destination) {
         // This was an outbound call (Leg A answered, now dial Customer)
-        await this.telephonyProvider.dialLegB(orgId, callId, bridgeId, destination);
+        await this.telephonyProvider.dialLegB(
+          orgId,
+          callId,
+          bridgeId,
+          destination,
+        );
       }
     } else if (role === 'customer' && bridgeId) {
       await this.telephonyProvider.joinBridge(orgId, bridgeId, channelId);
-      await this.telephonyProvider.startBridgeRecording(orgId, bridgeId, callId);
+      await this.telephonyProvider.startBridgeRecording(
+        orgId,
+        bridgeId,
+        callId,
+      );
 
       // Start Real-Time AI Coaching (Giant Gap Feature)
-      await this.transcriptionProvider.startTranscription(orgId, callId, async (event) => {
-        if (event.isFinal) {
-          // Resolve agentId from the bridge/call context
-          const agentId = 'TODO_RESOLVE_AGENT_ID'; 
-          await this.intelligenceService.analyzeSnippet(orgId, callId, agentId, event.text);
-        }
-      });
+      await this.transcriptionProvider.startTranscription(
+        orgId,
+        callId,
+        async (event) => {
+          if (event.isFinal) {
+            // Resolve agentId from the bridge/call context
+            const agentId = 'TODO_RESOLVE_AGENT_ID';
+            await this.intelligenceService.analyzeSnippet(
+              orgId,
+              callId,
+              agentId,
+              event.text,
+            );
+          }
+        },
+      );
     }
   }
 
@@ -105,7 +147,7 @@ export class CallOrchestratorService implements OnModuleInit {
     // Auto-transition agent to WRAP_UP when they finish a call
     if (role === 'agent' && userId) {
       await this.agentStateService.setStatus(userId, AgentStatus.WRAP_UP);
-      
+
       // Auto-set back to AVAILABLE after 30 seconds (standard wrap-up time)
       setTimeout(async () => {
         await this.agentStateService.setStatus(userId, AgentStatus.AVAILABLE);

@@ -1,19 +1,19 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class RecreateAsteriskTablesClean1766323000000 implements MigrationInterface {
-    name = 'RecreateAsteriskTablesClean1766323000000'
+  name = 'RecreateAsteriskTablesClean1766323000000';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // Drop existing tables to ensure a clean slate with no VARCHAR metadata lingering
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_domain_aliases"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_contacts"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_aors"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_auths"`);
-        await queryRunner.query(`DROP TABLE IF EXISTS "ps_endpoints"`);
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // Drop existing tables to ensure a clean slate with no VARCHAR metadata lingering
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_domain_aliases"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_contacts"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_aors"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_auths"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "ps_endpoints"`);
 
-        // Recreate using TEXT for ALL string columns to prevent ODBC padding
-        
-        await queryRunner.query(`
+    // Recreate using TEXT for ALL string columns to prevent ODBC padding
+
+    await queryRunner.query(`
             CREATE TABLE "ps_endpoints" (
                 "id" TEXT PRIMARY KEY,
                 "transport" TEXT,
@@ -44,7 +44,7 @@ export class RecreateAsteriskTablesClean1766323000000 implements MigrationInterf
             )
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE TABLE "ps_auths" (
                 "id" TEXT PRIMARY KEY,
                 "auth_type" TEXT,
@@ -54,7 +54,7 @@ export class RecreateAsteriskTablesClean1766323000000 implements MigrationInterf
             )
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE TABLE "ps_aors" (
                 "id" TEXT PRIMARY KEY,
                 "max_contacts" INTEGER,
@@ -65,7 +65,7 @@ export class RecreateAsteriskTablesClean1766323000000 implements MigrationInterf
             )
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE TABLE "ps_contacts" (
                 "id" TEXT PRIMARY KEY,
                 "uri" TEXT,
@@ -82,15 +82,15 @@ export class RecreateAsteriskTablesClean1766323000000 implements MigrationInterf
             )
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE TABLE "ps_domain_aliases" (
                 "id" TEXT PRIMARY KEY,
                 "domain" TEXT
             )
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // No-op
-    }
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // No-op
+  }
 }

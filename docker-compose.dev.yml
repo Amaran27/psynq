@@ -5,13 +5,13 @@ services:
     environment:
       - POSTGRES_USER=psynq_user
       - POSTGRES_PASSWORD=mysecretpassword
-      - POSTGRES_DB=psynq_db
+      - POSTGRES_DB=psynq
     volumes:
       - pgdata:/var/lib/postgresql/data
       # Mount database initialization scripts
       - ./deploy/db:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U psynq_user -d psynq_db || exit 1"]
+      test: ["CMD-SHELL", "pg_isready -U psynq_user -d psynq || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -79,7 +79,7 @@ services:
       - DB_PORT=5432
       - DB_USER=psynq_user
       - DB_PASSWORD=mysecretpassword
-      - DB_DATABASE=psynq_db
+      - DB_DATABASE=psynq
       - ARI_USER=psynq-app
       - ARI_PASSWORD=psynq-pass
       # MinIO configuration for recording uploads
@@ -141,7 +141,7 @@ services:
       - DB_PORT=5432
       - DB_USERNAME=psynq_user
       - DB_PASSWORD=mysecretpassword
-      - DB_DATABASE=psynq_db
+      - DB_DATABASE=psynq
       - REDIS_HOST=127.0.0.1
       - REDIS_PORT=6379
       - MINIO_ENDPOINT=127.0.0.1

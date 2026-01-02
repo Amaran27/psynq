@@ -4,7 +4,8 @@ import { TelephonyPort } from './ports/telephony.port';
 @Controller('health')
 export class HealthController {
   constructor(
-    @Inject('TELEPHONY_PROVIDER') private readonly telephonyProvider: TelephonyPort
+    @Inject('TELEPHONY_PROVIDER')
+    private readonly telephonyProvider: TelephonyPort,
   ) {}
 
   @Get('telephony')

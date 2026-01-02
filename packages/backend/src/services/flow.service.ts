@@ -13,7 +13,9 @@ export class FlowService {
   ) {}
 
   async getDefaultFlowForOrg(orgId: string): Promise<FlowEntity | null> {
-    return await this.flowRepository.findOne({ where: { organizationId: orgId } });
+    return await this.flowRepository.findOne({
+      where: { organizationId: orgId },
+    });
   }
 
   async getFlowById(id: string): Promise<FlowEntity | null> {

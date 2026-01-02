@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from 'typeorm';
 import { UserEntity } from './user.entity';
 import { CallEntity } from './call.entity';
 import { SettingEntity } from './setting.entity';
@@ -14,8 +21,8 @@ export class OrganizationEntity {
   @Column({ unique: true })
   slug: string; // Used for subdomains or clean URLs
 
-  @Column({ default: true })
-  isActive: boolean;
+  @Column({ default: 'active' })
+  status: string;
 
   @CreateDateColumn()
   createdAt: Date;

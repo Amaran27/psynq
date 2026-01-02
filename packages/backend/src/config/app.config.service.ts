@@ -38,7 +38,9 @@ export class AppConfigService {
   get asteriskWebRtcUri(): string {
     // Explicitly use 127.0.0.1 and remove any prefix
     if (this.nodeEnv === 'production') {
-      return process.env.ASTERISK_WEBRTC_URI || 'wss://asterisk.psynq.com:8089/ws';
+      return (
+        process.env.ASTERISK_WEBRTC_URI || 'wss://asterisk.psynq.com:8089/ws'
+      );
     }
     return process.env.ASTERISK_WEBRTC_URI || 'ws://127.0.0.1:8088/ws';
   }

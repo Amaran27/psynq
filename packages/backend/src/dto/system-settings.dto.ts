@@ -1,4 +1,12 @@
-import { IsString, IsBoolean, IsNumber, IsObject, IsOptional, IsIn, Min } from 'class-validator';
+import {
+  IsString,
+  IsBoolean,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsIn,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -6,7 +14,9 @@ import { Type } from 'class-transformer';
  */
 export class UpdateStorageConfigDto {
   @IsString()
-  @IsIn(['minio', 's3', 'local'], { message: 'Provider must be one of: minio, s3, local' })
+  @IsIn(['minio', 's3', 'local'], {
+    message: 'Provider must be one of: minio, s3, local',
+  })
   provider: string;
 
   @IsObject()
@@ -20,7 +30,9 @@ export class UpdateStorageConfigDto {
 export class UpdateTelephonyConfigDto {
   @IsString()
   @IsOptional()
-  @IsIn(['asterisk', 'twilio'], { message: 'Trunk must be one of: asterisk, twilio' })
+  @IsIn(['asterisk', 'twilio'], {
+    message: 'Trunk must be one of: asterisk, twilio',
+  })
   trunk?: string;
 
   @IsObject()
@@ -42,7 +54,9 @@ export class UpdateRecordingConfigDto {
   autoDeleteDays?: number;
 
   @IsString()
-  @IsIn(['wav', 'mp3', 'ogg'], { message: 'Format must be one of: wav, mp3, ogg' })
+  @IsIn(['wav', 'mp3', 'ogg'], {
+    message: 'Format must be one of: wav, mp3, ogg',
+  })
   @IsOptional()
   format?: string;
 

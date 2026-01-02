@@ -1,4 +1,9 @@
-import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnection } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+} from '@nestjs/websockets';
 import { Inject, Logger, OnModuleInit } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { Call, CallState, CallDirection } from '@psynq/core';
@@ -31,10 +36,12 @@ export class CallGateway implements OnGatewayConnection, OnModuleInit {
   async handleConnection(client: Socket) {
     try {
       // Check auth object first (standard for socket.io), then fall back to headers
-      const token = client.handshake.auth?.token || client.handshake.headers.authorization?.split(' ')[1];
-      
+      const token =
+        client.handshake.auth?.token ||
+        client.handshake.headers.authorization?.split(' ')[1];
+
       if (!token) throw new Error('No token provided');
-      
+
       const payload = this.jwtService.verify(token);
       const orgId = payload.orgId || payload.organizationId;
 
@@ -58,7 +65,7 @@ export class CallGateway implements OnGatewayConnection, OnModuleInit {
   }
 
   emitNewCall(call: any) {
-    const orgId = (call as any).organizationId;
+    const orgId = call.organizationId;
     if (orgId) {
       this.server.to(`org_${orgId}`).emit('newCall', call);
     } else {

@@ -12,9 +12,18 @@ export class IntelligenceService {
     private readonly settingsService: SettingsService,
   ) {}
 
-  async analyzeSnippet(orgId: string, callId: string, agentId: string, text: string) {
+  async analyzeSnippet(
+    orgId: string,
+    callId: string,
+    agentId: string,
+    text: string,
+  ) {
     try {
-      const config = await this.settingsService.getSetting(orgId, 'intelligence.openai.config', true);
+      const config = await this.settingsService.getSetting(
+        orgId,
+        'intelligence.openai.config',
+        true,
+      );
       if (!config?.apiKey) return;
 
       const chat = new ChatOpenAI({
@@ -25,8 +34,11 @@ export class IntelligenceService {
 
       // Industry Standard: Provide real-time coaching tips
       const response = await chat.invoke([
-        ['system', 'You are a real-time call center coach. Analyze the customer transcript and provide a 1-sentence Next Best Action for the agent.'],
-        ['user', text]
+        [
+          'system',
+          'You are a real-time call center coach. Analyze the customer transcript and provide a 1-sentence Next Best Action for the agent.',
+        ],
+        ['user', text],
       ]);
 
       const tip = response.content.toString();
@@ -37,7 +49,6 @@ export class IntelligenceService {
         payload: { callId, agentId, tip },
         timestamp: new Date(),
       });
-
     } catch (e) {
       this.logger.error(`AI Analysis failed: ${e.message}`);
     }

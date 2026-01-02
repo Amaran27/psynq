@@ -22,8 +22,8 @@ import { SettingsModule } from '../settings.module';
     },
     {
       provide: 'StoragePort',
-      useExisting: 'STORAGE_PROVIDER'
-    }
+      useExisting: 'STORAGE_PROVIDER',
+    },
   ],
   controllers: [StorageController],
   exports: [StorageService, 'STORAGE_PROVIDER', 'StoragePort'],

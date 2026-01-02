@@ -22,21 +22,28 @@ async function provision() {
   console.log(`Provisioning Sip2Sip Trunk: ${SIP2SIP_DOMAIN}`);
 
   // 1. Create AOR
-  await qr.query(`
+  await qr.query(
+    `
     INSERT INTO ps_aors (id, contact, qualify_frequency)
     VALUES ($1, $2, 30)
     ON CONFLICT (id) DO UPDATE SET contact = $2
-  `, [SIP2SIP_TRUNK_ID, `sip:${SIP2SIP_DOMAIN}`]);
+  `,
+    [SIP2SIP_TRUNK_ID, `sip:${SIP2SIP_DOMAIN}`],
+  );
 
   // 2. Create Auth
-  await qr.query(`
+  await qr.query(
+    `
     INSERT INTO ps_auths (id, auth_type, username, password)
     VALUES ($1, 'userpass', $2, $3)
     ON CONFLICT (id) DO UPDATE SET username = $2, password = $3
-  `, [`${SIP2SIP_TRUNK_ID}-auth`, SIP2SIP_USER, SIP2SIP_PASS]);
+  `,
+    [`${SIP2SIP_TRUNK_ID}-auth`, SIP2SIP_USER, SIP2SIP_PASS],
+  );
 
   // 3. Create Endpoint (only include columns that exist in current schema)
-  await qr.query(`
+  await qr.query(
+    `
     INSERT INTO ps_endpoints (
         id, transport, aors, auth, context,
         disallow, allow, rewrite_contact, force_rport,
@@ -47,7 +54,9 @@ async function provision() {
         'yes'
     )
     ON CONFLICT (id) DO UPDATE SET auth = $3
-  `, [SIP2SIP_TRUNK_ID, SIP2SIP_TRUNK_ID, `${SIP2SIP_TRUNK_ID}-auth`]);
+  `,
+    [SIP2SIP_TRUNK_ID, SIP2SIP_TRUNK_ID, `${SIP2SIP_TRUNK_ID}-auth`],
+  );
 
   console.log('Sip2Sip Trunk Provisioned successfully.');
   await AppDataSource.destroy();

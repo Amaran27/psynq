@@ -19,12 +19,14 @@ const BASE_URL = `https://api.twilio.com/2010-04-01/Accounts/${ACCOUNT_SID}`;
 
 async function apiCall(endpoint: string, method: string = 'GET', data?: any) {
   const url = `${BASE_URL}${endpoint}.json`;
-  const auth = Buffer.from(`${API_KEY_SID}:${API_KEY_SECRET}`).toString('base64');
+  const auth = Buffer.from(`${API_KEY_SID}:${API_KEY_SECRET}`).toString(
+    'base64',
+  );
 
   const options: any = {
     method,
     headers: {
-      'Authorization': `Basic ${auth}`,
+      Authorization: `Basic ${auth}`,
       'Content-Type': 'application/x-www-form-urlencoded',
     },
   };
@@ -56,11 +58,16 @@ async function setupTrunk() {
 
     console.log('Adding credentials...');
     const username = 'psynq-user';
-    const password = 'SecurePass123!' + Math.random().toString(36).substring(2, 8);
-    const cred = await apiCall(`/SIP/CredentialLists/${credList.sid}/Credentials`, 'POST', {
-      Username: username,
-      Password: password,
-    });
+    const password =
+      'SecurePass123!' + Math.random().toString(36).substring(2, 8);
+    const cred = await apiCall(
+      `/SIP/CredentialLists/${credList.sid}/Credentials`,
+      'POST',
+      {
+        Username: username,
+        Password: password,
+      },
+    );
     console.log('Credentials added:', cred.username);
 
     console.log('Creating SIP Trunk...');
@@ -77,7 +84,6 @@ async function setupTrunk() {
     console.log(`TWILIO_DOMAIN=${domain}`);
     console.log(`TWILIO_USER=${username}`);
     console.log(`TWILIO_PASS=${password}`);
-
   } catch (error) {
     console.error('Error:', error.message);
   }

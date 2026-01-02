@@ -13,6 +13,8 @@
     "start:debug": "cross-env NODE_ENV=development nest start --debug --watch",
     "start:prod": "cross-env NODE_ENV=production node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "arch:test": "depcruise --config dependency-cruiser.js src --include-only '^src/modules' --output-type text",
+    "verify": "npm run lint && npm run arch:test",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -40,8 +42,10 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-socket.io": "^11.1.9",
+    "@nestjs/swagger": "^11.0.0",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.9",
+    "swagger-ui-express": "^5.0.1",
     "@psynq/core": "file:../core",
     "ari-client": "^2.2.0",
     "bcrypt": "^6.0.0",
@@ -65,6 +69,7 @@
     "typeorm": "^0.3.28"
   },
   "devDependencies": {
+      "dependency-cruiser": "^16.8.0",
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
@@ -101,6 +106,12 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!@psynq)"
+    ],
+    "moduleNameMapper": {
+      "^@psynq/core$": "<rootDir>/../../core/dist/index.js"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

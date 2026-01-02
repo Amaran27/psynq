@@ -14,5 +14,8 @@ export interface EventBusPort {
   /**
    * Subscribes to a specific event type or pattern
    */
-  subscribe(pattern: string, callback: (event: PsynqEvent) => void): Promise<void>;
+  subscribe(
+    pattern: string,
+    callback: (event: PsynqEvent) => void,
+  ): Promise<void>;
 }

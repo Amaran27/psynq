@@ -1,11 +1,22 @@
-import { Injectable, Inject, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { SettingEntity } from '../entities/setting.entity';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { CryptoUtil } from '../utils/crypto.util';
-import { validateOrReject, IsEnum, IsString, IsOptional, IsUrl } from 'class-validator';
+import {
+  validateOrReject,
+  IsEnum,
+  IsString,
+  IsOptional,
+  IsUrl,
+} from 'class-validator';
 import { plainToInstance, Expose } from 'class-transformer';
 
 export class AsteriskConfigDto {
@@ -53,22 +64,31 @@ export class SettingsService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  async getSetting<T>(orgId: string | null, key: string, includeSecrets = false, cls?: new () => T): Promise<T | any> {
+  async getSetting<T>(
+    orgId: string | null,
+    key: string,
+    includeSecrets = false,
+    cls?: new () => T,
+  ): Promise<T | any> {
     const cacheKey = `settings:${orgId || 'system'}:${key}`;
     const cached = await this.cacheManager.get(cacheKey);
-    
+
     let result: any;
     if (cached !== undefined && cached !== null) {
       result = this.processSettingValue(cached, includeSecrets);
     } else {
       // 1. Try Org-specific
-      let setting = orgId 
-        ? await this.settingsRepository.findOne({ where: { organizationId: orgId, key } })
+      let setting = orgId
+        ? await this.settingsRepository.findOne({
+            where: { organizationId: orgId, key },
+          })
         : null;
 
       // 2. Try System-default
       if (!setting) {
-        setting = await this.settingsRepository.findOne({ where: { organizationId: IsNull(), key } });
+        setting = await this.settingsRepository.findOne({
+          where: { organizationId: IsNull(), key },
+        });
       }
 
       if (!setting) return null;
@@ -80,8 +100,15 @@ export class SettingsService {
       }
 
       // Cache the plain value (internally)
-      await this.cacheManager.set(cacheKey, { value, isSecret: setting.isSecret }, 3600);
-      result = this.processSettingValue({ value, isSecret: setting.isSecret }, includeSecrets);
+      await this.cacheManager.set(
+        cacheKey,
+        { value, isSecret: setting.isSecret },
+        3600,
+      );
+      result = this.processSettingValue(
+        { value, isSecret: setting.isSecret },
+        includeSecrets,
+      );
     }
 
     if (cls && result && typeof result === 'object') {
@@ -90,11 +117,16 @@ export class SettingsService {
     return result;
   }
 
-  async setSetting(orgId: string | null, key: string, value: any, isSecret = false): Promise<void> {
+  async setSetting(
+    orgId: string | null,
+    key: string,
+    value: any,
+    isSecret = false,
+  ): Promise<void> {
     // Standard industry validation using classes
     if (key === 'telephony.asterisk.config') {
       const dto = plainToInstance(AsteriskConfigDto, value);
-      await validateOrReject(dto).catch(errors => {
+      await validateOrReject(dto).catch((errors) => {
         throw new BadRequestException(errors.toString());
       });
     }
@@ -104,9 +136,14 @@ export class SettingsService {
       storedValue = CryptoUtil.encrypt(value);
     }
 
-    let setting = await this.settingsRepository.findOne({ where: { organizationId: orgId === null ? IsNull() : orgId, key } });
+    let setting = await this.settingsRepository.findOne({
+      where: { organizationId: orgId === null ? IsNull() : orgId, key },
+    });
     if (!setting) {
-      setting = this.settingsRepository.create({ organizationId: orgId as string, key });
+      setting = this.settingsRepository.create({
+        organizationId: orgId as string,
+        key,
+      });
     }
 
     setting.value = storedValue;
@@ -118,14 +155,20 @@ export class SettingsService {
     await this.cacheManager.del(cacheKey);
   }
 
-  async getAllSettings(orgId: string | null, includeSecrets = false): Promise<any[]> {
+  async getAllSettings(
+    orgId: string | null,
+    includeSecrets = false,
+  ): Promise<any[]> {
     const settings = await this.settingsRepository.find({
       where: { organizationId: orgId === null ? IsNull() : orgId },
     });
 
-    return settings.map(setting => ({
+    return settings.map((setting) => ({
       key: setting.key,
-      value: this.processSettingValue({ value: setting.value, isSecret: setting.isSecret }, includeSecrets),
+      value: this.processSettingValue(
+        { value: setting.value, isSecret: setting.isSecret },
+        includeSecrets,
+      ),
       isSecret: setting.isSecret,
       updatedAt: setting.updatedAt,
     }));

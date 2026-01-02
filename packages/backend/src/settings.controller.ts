@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, UseGuards, Req, Param, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Req,
+  Param,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { Roles } from './auth/roles.decorator';
@@ -21,12 +30,17 @@ export class SettingsController {
   @Post(':key')
   @Roles(UserRole.ADMIN)
   async setSetting(
-    @Param('key') key: string, 
-    @Body() body: { value: any, isSecret?: boolean }, 
-    @Req() req: any
+    @Param('key') key: string,
+    @Body() body: { value: any; isSecret?: boolean },
+    @Req() req: any,
   ) {
     const { organizationId } = req.context;
-    await this.settingsService.setSetting(organizationId, key, body.value, body.isSecret);
+    await this.settingsService.setSetting(
+      organizationId,
+      key,
+      body.value,
+      body.isSecret,
+    );
     return { success: true };
   }
 

@@ -9,7 +9,13 @@ export interface StoragePort {
    * @param contentType - MIME type of the file
    * @param metadata - Optional metadata
    */
-  upload(organizationId: string | null, key: string, stream: Readable, contentType: string, metadata?: Record<string, string>): Promise<void>;
+  upload(
+    organizationId: string | null,
+    key: string,
+    stream: Readable,
+    contentType: string,
+    metadata?: Record<string, string>,
+  ): Promise<void>;
 
   /**
    * Generates a signed URL for secure access to a file.
@@ -18,7 +24,12 @@ export interface StoragePort {
    * @param expiresInSeconds - URL expiration time
    * @param operation - 'GET' for download, 'PUT' for upload
    */
-  getSignedUrl(organizationId: string | null, key: string, expiresInSeconds: number, operation: 'GET' | 'PUT'): Promise<string>;
+  getSignedUrl(
+    organizationId: string | null,
+    key: string,
+    expiresInSeconds: number,
+    operation: 'GET' | 'PUT',
+  ): Promise<string>;
 
   /**
    * Deletes a file from storage.
@@ -46,5 +57,9 @@ export interface StoragePort {
    * @param prefix - Prefix for files to manage
    * @param olderThanDays - Delete files older than this many days
    */
-  applyLifecyclePolicy(organizationId: string | null, prefix: string, olderThanDays: number): Promise<void>;
+  applyLifecyclePolicy(
+    organizationId: string | null,
+    prefix: string,
+    olderThanDays: number,
+  ): Promise<void>;
 }

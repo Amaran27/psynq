@@ -23,13 +23,13 @@ export function extractParticipantData(participantId: string): {
   if (participantId.startsWith('asterisk:')) {
     return {
       providerType: 'asterisk',
-      participantSid: participantId.split(':')[1]
+      participantSid: participantId.split(':')[1],
     };
   }
-  
+
   return {
     providerType: 'unknown',
-    participantSid: participantId
+    participantSid: participantId,
   };
 }
 
@@ -39,7 +39,7 @@ export function extractParticipantData(participantId: string): {
 export function getProviderParticipantId(participant: CallParticipant): string {
   // For Asterisk, the providerCallSid is the ARI channel ID
   if (participant?.providerCallSid) return participant.providerCallSid;
-  
+
   // Extract from ID if sid is missing
   const data = extractParticipantData(participant.id);
   return data.participantSid;

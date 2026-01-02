@@ -20,16 +20,16 @@ const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD || 'mysecretpassword',
   database: process.env.DB_DATABASE || 'psynq_db',
   entities: [
-    CallEntity, 
-    UserEntity, 
-    CallParticipantEntity, 
-    RecordingEntity, 
+    CallEntity,
+    UserEntity,
+    CallParticipantEntity,
+    RecordingEntity,
     SettingEntity,
     OrganizationEntity,
     QueueEntity,
     FlowEntity,
     RateEntity,
-    WalletEntity
+    WalletEntity,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
 });
