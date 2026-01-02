@@ -2647,10 +2647,10 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 2. API Key (Service Accounts)
 ```http
-X-API-Key: sk_live_YOUR_API_KEY_HERE
+X-API-Key: your_api_key_here
 ```
 
-**Key Format**: `sk_live_{32-char hex}` or `sk_test_{32-char hex}`
+**Key Format**: api_live_{32-char-hex} or api_test_{32-char-hex}
 
 ---
 

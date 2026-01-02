@@ -6,9 +6,9 @@ dotenv.config({ path: '.env' });
 console.log('TWILIO_ACCOUNT_MAIN_SID:', process.env.TWILIO_ACCOUNT_MAIN_SID);
 console.log('TWILIO_AUTH_MAIN_TOKEN:', process.env.TWILIO_AUTH_MAIN_TOKEN);
 
-const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_MAIN_SID; // Use the account SID from environment
-const API_KEY_SID = process.env.TWILIO_ACCOUNT_MAIN_SID;
-const API_KEY_SECRET = process.env.TWILIO_AUTH_MAIN_TOKEN;
+const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_MAIN_SID || 'AC_YOUR_ACCOUNT_SID_HERE'; // Use the account SID from environment
+const API_KEY_SID = process.env.TWILIO_ACCOUNT_MAIN_SID || 'SK_YOUR_API_KEY_SID_HERE';
+const API_KEY_SECRET = process.env.TWILIO_AUTH_MAIN_TOKEN || 'YOUR_AUTH_TOKEN_HERE';
 
 if (!API_KEY_SID || !API_KEY_SECRET) {
   console.error('Missing TWILIO_ACCOUNT_MAIN_SID or TWILIO_AUTH_MAIN_TOKEN');
