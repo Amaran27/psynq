@@ -339,6 +339,14 @@ export class CallService implements OnModuleInit {
     try {
       this.stateMachine.holdCall(call);
       await this.callRepository.save(this.domainToEntity(call));
+      
+      const orgId = (call as any).organizationId || null;
+      await this.telephonyProvider.setParticipantOnHold(
+        orgId, 
+        call.externalId || call.id, 
+        true
+      );
+
       await this.publishCallUpdate(this.mapToResponseDto(call));
       return this.mapToResponseDto(call);
     } catch (error) {
@@ -352,6 +360,14 @@ export class CallService implements OnModuleInit {
     try {
       this.stateMachine.resumeCall(call);
       await this.callRepository.save(this.domainToEntity(call));
+
+      const orgId = (call as any).organizationId || null;
+      await this.telephonyProvider.setParticipantOnHold(
+        orgId, 
+        call.externalId || call.id, 
+        false
+      );
+
       await this.publishCallUpdate(this.mapToResponseDto(call));
       return this.mapToResponseDto(call);
     } catch (error) {
