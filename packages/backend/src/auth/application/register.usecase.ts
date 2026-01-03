@@ -23,7 +23,7 @@ export class RegisterUseCase {
     private readonly passwordService: IPasswordService,
   ) {}
 
-  async execute(username: string, password: string): Promise<AuthUser> {
+  async execute(username: string, password: string, email: string): Promise<AuthUser> {
     // Domain validation
     if (!Authentication.isValidUsername(username)) {
       throw new BadRequestException('Username must be 3-50 characters');
@@ -39,12 +39,20 @@ export class RegisterUseCase {
       throw new ConflictException('Username already exists');
     }
 
+    // Check if email exists
+    if (email) {
+      const emailExists = await this.authRepository.emailExists(email);
+      if (emailExists) {
+        throw new ConflictException('Email already exists');
+      }
+    }
+
     // Hash password
     const hashedPassword = await this.passwordService.hash(password);
 
     // Create user with default role
     const user = await this.authRepository.create(
-      { username, password },
+      { username, password, email },
       hashedPassword,
       Authentication.DEFAULT_ROLE,
     );

@@ -37,6 +37,10 @@ import { QueueEntity } from './entities/queue.entity';
 import { FlowEntity } from './entities/flow.entity';
 import { WalletEntity } from './entities/wallet.entity';
 import { RateEntity } from './entities/rate.entity';
+import { PasswordResetTokenEntity } from './entities/password-reset-token.entity';
+import { EmailVerificationTokenEntity } from './entities/email-verification-token.entity';
+import { SessionEntity } from './entities/session.entity';
+import { FailedLoginEntity } from './entities/failed-login.entity';
 import { ConfigModule as AppConfigModule } from './config/config.module';
 // import { RecordingsModule } from './recordings/recordings.module'; // Temporarily disabled - missing minio module
 
@@ -77,6 +81,10 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
           FlowEntity,
           WalletEntity,
           RateEntity,
+          PasswordResetTokenEntity,
+          EmailVerificationTokenEntity,
+          SessionEntity,
+          FailedLoginEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],

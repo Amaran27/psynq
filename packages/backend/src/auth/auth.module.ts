@@ -4,6 +4,10 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UserEntity } from '../entities/user.entity';
+import { PasswordResetTokenEntity } from '../entities/password-reset-token.entity';
+import { EmailVerificationTokenEntity } from '../entities/email-verification-token.entity';
+import { SessionEntity } from '../entities/session.entity';
+import { FailedLoginEntity } from '../entities/failed-login.entity';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { LocalStrategy } from './local.strategy';
@@ -16,6 +20,13 @@ import { RegisterUseCase } from './application/register.usecase';
 import { LoginUseCase } from './application/login.usecase';
 import { RefreshTokenUseCase } from './application/refresh-token.usecase';
 import { UpdateStatusUseCase } from './application/update-status.usecase';
+import { ForgotPasswordUseCase } from './application/forgot-password.usecase';
+import { ResetPasswordUseCase } from './application/reset-password.usecase';
+import { VerifyEmailUseCase } from './application/verify-email.usecase';
+import { ResendVerificationUseCase } from './application/resend-verification.usecase';
+import { GetSessionsUseCase } from './application/get-sessions.usecase';
+import { RevokeSessionUseCase } from './application/revoke-session.usecase';
+import { RevokeAllSessionsUseCase } from './application/revoke-all-sessions.usecase';
 import { TypeOrmAuthRepository } from './adapters/typeorm-auth-repository.adapter';
 import { JwtTokenService } from './adapters/jwt-token.adapter';
 import { BcryptPasswordService } from '../modules/user/adapters/bcrypt-password.adapter';
@@ -27,7 +38,13 @@ import {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserEntity]),
+    TypeOrmModule.forFeature([
+      UserEntity,
+      PasswordResetTokenEntity,
+      EmailVerificationTokenEntity,
+      SessionEntity,
+      FailedLoginEntity,
+    ]),
     PassportModule,
     ConfigModule,
     JwtModule.registerAsync({
@@ -95,6 +112,55 @@ import {
       provide: UpdateStatusUseCase,
       useFactory: (authRepo: IAuthRepository) => {
         return new UpdateStatusUseCase(authRepo);
+      },
+      inject: ['IAuthRepository'],
+    },
+    {
+      provide: ForgotPasswordUseCase,
+      useFactory: (authRepo: IAuthRepository) => {
+        return new ForgotPasswordUseCase(authRepo);
+      },
+      inject: ['IAuthRepository'],
+    },
+    {
+      provide: ResetPasswordUseCase,
+      useFactory: (authRepo: IAuthRepository) => {
+        return new ResetPasswordUseCase(authRepo);
+      },
+      inject: ['IAuthRepository'],
+    },
+    {
+      provide: VerifyEmailUseCase,
+      useFactory: (authRepo: IAuthRepository) => {
+        return new VerifyEmailUseCase(authRepo);
+      },
+      inject: ['IAuthRepository'],
+    },
+    {
+      provide: ResendVerificationUseCase,
+      useFactory: (authRepo: IAuthRepository) => {
+        return new ResendVerificationUseCase(authRepo);
+      },
+      inject: ['IAuthRepository'],
+    },
+    {
+      provide: GetSessionsUseCase,
+      useFactory: (authRepo: IAuthRepository) => {
+        return new GetSessionsUseCase(authRepo);
+      },
+      inject: ['IAuthRepository'],
+    },
+    {
+      provide: RevokeSessionUseCase,
+      useFactory: (authRepo: IAuthRepository) => {
+        return new RevokeSessionUseCase(authRepo);
+      },
+      inject: ['IAuthRepository'],
+    },
+    {
+      provide: RevokeAllSessionsUseCase,
+      useFactory: (authRepo: IAuthRepository) => {
+        return new RevokeAllSessionsUseCase(authRepo);
       },
       inject: ['IAuthRepository'],
     },

@@ -19,11 +19,13 @@ export interface AuthUser {
   roles: UserRole[];
   organizationId: string | null;
   status: string;
+  emailVerified?: boolean;
 }
 
 export interface AuthCredentials {
   username: string;
   password: string;
+  email?: string;
 }
 
 export interface AuthTokens {
