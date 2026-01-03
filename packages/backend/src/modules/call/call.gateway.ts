@@ -8,7 +8,7 @@ import { Inject, Logger, OnModuleInit } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { Call, CallState, CallDirection } from '@psynq/core';
 import { JwtService } from '@nestjs/jwt';
-import { EventBusPort } from './ports/event-bus.port';
+import { EventBusPort } from '../../ports/event-bus.port';
 
 @WebSocketGateway({
   cors: { origin: '*' },

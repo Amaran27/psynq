@@ -9,13 +9,13 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
-import { CallService } from './services/call.service';
-import { CreateCallDto, CallResponseDto, CallActionDto } from './dtos/call.dto';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { CallService } from './call.service';
+import { CreateCallDto, CallResponseDto, CallActionDto } from '../../dtos/call.dto';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import {
   SupervisorControlOptions,
   CallParticipant,
-} from './interfaces/call-participant.interface';
+} from '../../interfaces/call-participant.interface';
 
 @Controller('calls')
 @UseGuards(JwtAuthGuard)

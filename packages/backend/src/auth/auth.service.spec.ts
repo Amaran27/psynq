@@ -8,7 +8,7 @@ import { AuthService } from './auth.service';
 import { UserEntity, UserRole } from '../entities/user.entity';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { AgentStatus } from '@psynq/core';
-import { CallService } from '../services/call.service';
+import { CallService } from '../modules/call/call.service';
 
 // Mock bcrypt
 jest.mock('bcrypt', () => ({

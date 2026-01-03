@@ -9,7 +9,7 @@ import { AuthController } from './auth.controller';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { forwardRef } from '@nestjs/common';
-import { CallModule } from '../call/call.module';
+import { CallModule } from '../modules/call/call.module';
 
 // Hexagonal Architecture Imports
 import { RegisterUseCase } from './application/register.usecase';

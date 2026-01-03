@@ -12,7 +12,7 @@ import { hash, compare, genSalt } from 'bcrypt';
 import { UserEntity, UserRole } from '../entities/user.entity';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { AgentStatus } from '@psynq/core';
-import { CallService } from '../services/call.service';
+import { CallService } from '../modules/call/call.service';
 
 @Injectable()
 export class AuthService {

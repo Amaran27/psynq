@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { Organization } from '../modules/organization/domain/organization.domain';
+import { Organization } from '../src/modules/organization/domain/organization.domain';
 import { randomUUID } from 'crypto';
 
 /**

@@ -9,26 +9,26 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 import { Call, CallState, CallStateMachine, CallDirection } from '@psynq/core';
-import { CreateCallDto, CallResponseDto } from '../dtos/call.dto';
-import { CallEntity } from '../entities/call.entity';
+import { CreateCallDto, CallResponseDto } from '../../dtos/call.dto';
+import { CallEntity } from '../../entities/call.entity';
 import { ConfigService } from '@nestjs/config';
 import {
   CallParticipant,
   SupervisorControlOptions,
-} from '../interfaces/call-participant.interface';
-import { CallParticipantService } from './call-participant.service';
-import { StorageService } from '../modules/storage/storage.service';
-import { getProviderParticipantId } from '../utils/participant-id.util';
-import { StandardWebhookEvent } from '../interfaces/webhook.interface';
-import { TelephonyPort } from '../ports/telephony.port';
-import { EventBusPort, PsynqEvent } from '../ports/event-bus.port';
-import { AgentStateService } from './agent-state.service';
-import { BillingService } from './billing.service';
+} from '../../interfaces/call-participant.interface';
+import { CallParticipantService } from '../../services/call-participant.service';
+import { StorageService } from '../storage/storage.service';
+import { getProviderParticipantId } from '../../utils/participant-id.util';
+import { StandardWebhookEvent } from '../../interfaces/webhook.interface';
+import { TelephonyPort } from '../../ports/telephony.port';
+import { EventBusPort, PsynqEvent } from '../../ports/event-bus.port';
+import { AgentStateService } from '../../services/agent-state.service';
+import { BillingService } from '../../services/billing.service';
 import {
   PsynqException,
   CallStateTransitionError,
   TelephonyProviderError,
-} from '../common/exceptions/psynq.exception';
+} from '../../common/exceptions/psynq.exception';
 import { instanceToPlain, plainToInstance } from 'class-transformer';
 
 @Injectable()

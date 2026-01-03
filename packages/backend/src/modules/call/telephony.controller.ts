@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Inject, UseGuards, Req } from '@nestjs/common';
-import { TelephonyPort } from '../ports/telephony.port';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TelephonyPort } from '../../ports/telephony.port';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
 @Controller('telephony')
 export class TelephonyController {

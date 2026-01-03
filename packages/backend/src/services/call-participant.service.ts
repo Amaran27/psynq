@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { CallParticipant } from '../interfaces/call-participant.interface';
 import { CallParticipantEntity } from '../entities/call-participant.entity';
-import { CallGateway } from '../call.gateway';
+import { CallGateway } from '../modules/call/call.gateway';
 
 @Injectable()
 export class CallParticipantService {

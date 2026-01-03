@@ -12,7 +12,7 @@ import { CallParticipantEntity } from './entities/call-participant.entity';
 import { RecordingEntity } from './entities/recording.entity';
 import { SettingEntity } from './entities/setting.entity';
 import { AuthModule } from './auth/auth.module';
-import { CallModule } from './call/call.module';
+import { CallModule } from './modules/call/call.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { AsteriskModule } from './modules/asterisk/asterisk.module';
 import { EventBusModule } from './modules/event-bus/event-bus.module';
