@@ -16,9 +16,15 @@ import { HangupChannelUseCase } from './application/hangup-channel.usecase';
 import { PlayMediaUseCase } from './application/play-media.usecase';
 import { ChannelController } from './channel.controller';
 import { ChannelEntity } from '../../entities/channel.entity';
+import { EventBusModule } from '../event-bus/event-bus.module';
+import { AsteriskModule } from '../asterisk/asterisk.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ChannelEntity])],
+  imports: [
+    TypeOrmModule.forFeature([ChannelEntity]),
+    EventBusModule,
+    AsteriskModule,
+  ],
   controllers: [ChannelController],
   providers: [
     // Adapter implements Port

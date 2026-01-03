@@ -22,6 +22,8 @@ import { StartRecordingUseCase } from './application/start-recording.usecase';
 import { StopRecordingUseCase } from './application/stop-recording.usecase';
 import { BridgeController } from './bridge.controller';
 import { BridgeEntity } from '../../entities/bridge.entity';
+import { EventBusModule } from '../event-bus/event-bus.module';
+import { AsteriskModule } from '../asterisk/asterisk.module';
 
 /**
  * Bridge Module with Hexagonal Architecture
@@ -33,7 +35,11 @@ import { BridgeEntity } from '../../entities/bridge.entity';
  * 4. Controller injects Use cases
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([BridgeEntity])],
+  imports: [
+    TypeOrmModule.forFeature([BridgeEntity]),
+    EventBusModule,
+    AsteriskModule,
+  ],
   controllers: [BridgeController],
   providers: [
     // Adapter implements Port (TypeORM implementation)

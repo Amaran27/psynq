@@ -20,6 +20,7 @@ import { CallModule } from './modules/call/call.module';
 import { ChannelModule } from './modules/channel/channel.module';
 import { BridgeModule } from './modules/bridge/bridge.module';
 import { CampaignModule } from './modules/campaign/campaign.module';
+import { DialerModule } from './modules/dialer/dialer.module';
 import { LeadModule } from './modules/lead/lead.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { AsteriskModule } from './modules/asterisk/asterisk.module';
@@ -41,6 +42,9 @@ import { PasswordResetTokenEntity } from './entities/password-reset-token.entity
 import { EmailVerificationTokenEntity } from './entities/email-verification-token.entity';
 import { SessionEntity } from './entities/session.entity';
 import { FailedLoginEntity } from './entities/failed-login.entity';
+import { LeadEntity as DialerLeadEntity } from './entities/dialer/lead.entity';
+import { DialingSessionEntity } from './entities/dialer/dialing-session.entity';
+import { DNCEntryEntity } from './entities/dialer/dnc-entry.entity';
 import { ConfigModule as AppConfigModule } from './config/config.module';
 // import { RecordingsModule } from './recordings/recordings.module'; // Temporarily disabled - missing minio module
 
@@ -85,6 +89,9 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
           EmailVerificationTokenEntity,
           SessionEntity,
           FailedLoginEntity,
+          DialerLeadEntity,
+          DialingSessionEntity,
+          DNCEntryEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -99,6 +106,7 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
     ChannelModule,
     BridgeModule,
     CampaignModule,
+    DialerModule,
     LeadModule,
     StorageModule,
     AsteriskModule,
