@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import { CallEntity } from './entities/call.entity';
 import { ChannelEntity } from './entities/channel.entity';
 import { BridgeEntity } from './entities/bridge.entity';
+import { CampaignEntity } from './entities/campaign.entity';
+import { LeadEntity } from './entities/lead.entity';
 import { UserEntity } from './entities/user.entity';
 import { CallParticipantEntity } from './entities/call-participant.entity';
 import { RecordingEntity } from './entities/recording.entity';
@@ -25,6 +27,8 @@ const AppDataSource = new DataSource({
     CallEntity,
     ChannelEntity,
     BridgeEntity,
+    CampaignEntity,
+    LeadEntity,
     UserEntity,
     CallParticipantEntity,
     RecordingEntity,

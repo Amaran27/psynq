@@ -11,12 +11,16 @@ import { UserEntity } from './entities/user.entity';
 import { CallParticipantEntity } from './entities/call-participant.entity';
 import { ChannelEntity } from './entities/channel.entity';
 import { BridgeEntity } from './entities/bridge.entity';
+import { CampaignEntity } from './entities/campaign.entity';
+import { LeadEntity } from './entities/lead.entity';
 import { RecordingEntity } from './entities/recording.entity';
 import { SettingEntity } from './entities/setting.entity';
 import { AuthModule } from './auth/auth.module';
 import { CallModule } from './modules/call/call.module';
 import { ChannelModule } from './modules/channel/channel.module';
 import { BridgeModule } from './modules/bridge/bridge.module';
+import { CampaignModule } from './modules/campaign/campaign.module';
+import { LeadModule } from './modules/lead/lead.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { AsteriskModule } from './modules/asterisk/asterisk.module';
 import { EventBusModule } from './modules/event-bus/event-bus.module';
@@ -62,6 +66,8 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
           CallEntity,
           ChannelEntity,
           BridgeEntity,
+          CampaignEntity,
+          LeadEntity,
           UserEntity,
           CallParticipantEntity,
           RecordingEntity,
@@ -84,6 +90,8 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
     CallModule,
     ChannelModule,
     BridgeModule,
+    CampaignModule,
+    LeadModule,
     StorageModule,
     AsteriskModule,
     EventBusModule,
