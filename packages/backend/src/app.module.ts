@@ -45,6 +45,9 @@ import { FailedLoginEntity } from './entities/failed-login.entity';
 import { LeadEntity as DialerLeadEntity } from './entities/dialer/lead.entity';
 import { DialingSessionEntity } from './entities/dialer/dialing-session.entity';
 import { DNCEntryEntity } from './entities/dialer/dnc-entry.entity';
+import { IVRFlowEntity } from './entities/ivr-flow.entity';
+import { IVRExecutionLogEntity } from './entities/ivr-execution-log.entity';
+import { IVRModule } from './modules/ivr/ivr.module';
 import { ConfigModule as AppConfigModule } from './config/config.module';
 // import { RecordingsModule } from './recordings/recordings.module'; // Temporarily disabled - missing minio module
 
@@ -92,6 +95,8 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
           DialerLeadEntity,
           DialingSessionEntity,
           DNCEntryEntity,
+          IVRFlowEntity,
+          IVRExecutionLogEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -107,6 +112,7 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
     BridgeModule,
     CampaignModule,
     DialerModule,
+    IVRModule,
     LeadModule,
     StorageModule,
     AsteriskModule,
