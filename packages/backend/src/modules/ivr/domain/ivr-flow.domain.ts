@@ -61,15 +61,16 @@ export interface IVRTransferConfig {
 
 export interface IVRWebhookConfig {
   url: string;
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PUT';
   headers?: Record<string, string>;
-  successNodeId: string;
+  responseVariable?: string;
+  successNodeId?: string;
   failureNodeId?: string;
 }
 
 export interface IVRConditionConfig {
   variable: string;
-  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'startsWith';
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'startsWith' | 'equals' | 'not_equals' | 'greater_than' | 'less_than';
   value: string;
   trueNodeId: string;
   falseNodeId: string;
@@ -77,6 +78,7 @@ export interface IVRConditionConfig {
 
 export interface IVRQueueConfig {
   queueName: string;
+  priority?: number;
   timeout: number;
   announcePosition: boolean;
   musicOnHold?: string;

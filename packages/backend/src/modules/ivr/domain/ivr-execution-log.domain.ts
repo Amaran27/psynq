@@ -13,12 +13,13 @@ export enum IVRExecutionStatus {
 
 export interface IVRExecutionStep {
   nodeId: string;
-  nodeName: string;
+  nodeName?: string;
   nodeType: string;
+  action: string;
   timestamp: Date;
   input?: string; // User input (DTMF digits)
   output?: string; // System response (prompt text)
-  duration: number; // milliseconds
+  duration?: number; // milliseconds
   error?: string;
 }
 

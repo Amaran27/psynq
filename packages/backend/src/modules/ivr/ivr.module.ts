@@ -18,7 +18,11 @@ import { DeleteFlowUseCase } from './application/delete-flow.usecase';
 import { ActivateFlowUseCase } from './application/activate-flow.usecase';
 import { GetExecutionLogUseCase } from './application/get-execution-log.usecase';
 import { GetFlowAnalyticsUseCase } from './application/get-flow-analytics.usecase';
+import { ExecuteIVRFlowUseCase } from './application/execute-ivr-flow.usecase';
 import { IVRController } from './ivr.controller';
+import { IVROrchestratorService } from './services/ivr-orchestrator.service';
+import { EventBusModule } from '../event-bus/event-bus.module';
+import { AsteriskModule } from '../asterisk/asterisk.module';
 
 @Module({
   imports: [
@@ -26,6 +30,8 @@ import { IVRController } from './ivr.controller';
       IVRFlowEntity,
       IVRExecutionLogEntity,
     ]),
+    EventBusModule,
+    AsteriskModule,
   ],
   controllers: [IVRController],
   providers: [
@@ -52,6 +58,10 @@ import { IVRController } from './ivr.controller';
     ActivateFlowUseCase,
     GetExecutionLogUseCase,
     GetFlowAnalyticsUseCase,
+    ExecuteIVRFlowUseCase,
+
+    // Services
+    IVROrchestratorService,
   ],
   exports: [
     'IVR_FLOW_REPOSITORY',
