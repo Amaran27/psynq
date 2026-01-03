@@ -43,6 +43,7 @@ async function bootstrap() {
       const registered = await authService.register({
         username: adminUsername,
         password: adminPassword,
+        email: `${adminUsername}@psynq.local`,
       });
       user = await userRepo.findOneBy({ id: (registered as any).id });
       console.log(`[CREATED] User ${adminUsername} registered.`);

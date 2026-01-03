@@ -124,6 +124,7 @@ async function seedAuthData() {
           const registered = await authService.register({
             username: userData.username,
             password: userData.password,
+            email: `${userData.username}@example.com`,
             roles: userData.roles,
             organizationId: undefined,
           });

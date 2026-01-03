@@ -14,6 +14,10 @@ import { QueueEntity } from './entities/queue.entity';
 import { FlowEntity } from './entities/flow.entity';
 import { RateEntity } from './entities/rate.entity';
 import { WalletEntity } from './entities/wallet.entity';
+import { PasswordResetTokenEntity } from './entities/password-reset-token.entity';
+import { EmailVerificationTokenEntity } from './entities/email-verification-token.entity';
+import { FailedLoginEntity } from './entities/failed-login.entity';
+import { SessionEntity } from './entities/session.entity';
 
 // DataSource used by TypeORM CLI for migrations and by deployment scripts.
 const AppDataSource = new DataSource({
@@ -38,6 +42,10 @@ const AppDataSource = new DataSource({
     FlowEntity,
     RateEntity,
     WalletEntity,
+    PasswordResetTokenEntity,
+    EmailVerificationTokenEntity,
+    FailedLoginEntity,
+    SessionEntity,
   ],
   migrations: [__dirname + '/migrations/*.{ts,js}'],
 });
