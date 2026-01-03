@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { CallEntity } from './entities/call.entity';
+import { ChannelEntity } from './entities/channel.entity';
 import { UserEntity } from './entities/user.entity';
 import { CallParticipantEntity } from './entities/call-participant.entity';
 import { RecordingEntity } from './entities/recording.entity';
@@ -21,6 +22,7 @@ const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || 'psynq_db',
   entities: [
     CallEntity,
+    ChannelEntity,
     UserEntity,
     CallParticipantEntity,
     RecordingEntity,
