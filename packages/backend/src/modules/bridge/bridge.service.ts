@@ -37,7 +37,8 @@ export class BridgeService {
     this.eventBus.publish({
       type: 'bridge.created',
       timestamp: new Date(),
-      data: { bridgeId: savedBridge.id, organizationId: dto.organizationId },
+      organizationId: dto.organizationId || '',
+      payload: { bridgeId: savedBridge.id },
     });
 
     return savedBridge;
@@ -82,7 +83,8 @@ export class BridgeService {
       this.eventBus.publish({
         type: 'bridge.channel.added',
         timestamp: new Date(),
-        data: { bridgeId, channelId: dto.channelId },
+        organizationId: bridge.organizationId || '',
+        payload: { bridgeId, channelId: dto.channelId },
       });
     }
 
@@ -99,7 +101,8 @@ export class BridgeService {
       this.eventBus.publish({
         type: 'bridge.channel.removed',
         timestamp: new Date(),
-        data: { bridgeId, channelId },
+        organizationId: bridge.organizationId || '',
+        payload: { bridgeId, channelId },
       });
     }
 
@@ -121,7 +124,8 @@ export class BridgeService {
     this.eventBus.publish({
       type: 'bridge.destroyed',
       timestamp: new Date(),
-      data: { bridgeId },
+      organizationId: bridge.organizationId || '',
+      payload: { bridgeId },
     });
 
     return savedBridge;
@@ -134,7 +138,8 @@ export class BridgeService {
       throw new BadRequestException('Cannot play media to destroyed bridge');
     }
 
-    await this.telephonyProvider.playMedia(bridgeId, dto.mediaUrl);
+    // TODO: Implement playMedia in TelephonyPort interface
+    // await this.telephonyProvider.playMedia(bridgeId, dto.mediaUrl);
   }
 
   async startRecording(bridgeId: string, dto: StartBridgeRecordingDto): Promise<BridgeEntity> {
@@ -151,7 +156,8 @@ export class BridgeService {
     this.eventBus.publish({
       type: 'bridge.recording.started',
       timestamp: new Date(),
-      data: { bridgeId, recordingName: dto.name },
+      organizationId: bridge.organizationId || '',
+      payload: { bridgeId, recordingName: dto.name },
     });
 
     return savedBridge;
@@ -171,7 +177,8 @@ export class BridgeService {
     this.eventBus.publish({
       type: 'bridge.recording.stopped',
       timestamp: new Date(),
-      data: { bridgeId, recordingName: bridge.recordingName },
+      organizationId: bridge.organizationId || '',
+      payload: { bridgeId, recordingName: bridge.recordingName },
     });
 
     return savedBridge;

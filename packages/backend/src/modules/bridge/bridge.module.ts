@@ -1,13 +1,15 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule as NestConfigModule } from '@nestjs/config';
 import { BridgeController } from './bridge.controller';
 import { BridgeService } from './bridge.service';
 import { BridgeEntity } from '../../entities/bridge.entity';
+import { AsteriskAdapter } from '../../adapters/asterisk.adapter';
 import { AsteriskModule } from '../asterisk/asterisk.module';
 import { EventBusModule } from '../event-bus/event-bus.module';
 import { StorageModule } from '../storage/storage.module';
-import { SettingsModule } from '../settings/settings.module';
+import { SettingsModule } from '../settings.module';
+import { ConfigModule } from '../../config/config.module';
 
 @Module({
   imports: [
@@ -17,14 +19,14 @@ import { SettingsModule } from '../settings/settings.module';
     StorageModule,
     SettingsModule,
     ConfigModule,
+    NestConfigModule,
   ],
   controllers: [BridgeController],
   providers: [
     BridgeService,
     {
       provide: 'TELEPHONY_PROVIDER',
-      useFactory: (asteriskAdapter) => asteriskAdapter,
-      inject: ['AsteriskAdapter'],
+      useClass: AsteriskAdapter,
     },
   ],
   exports: [BridgeService],
