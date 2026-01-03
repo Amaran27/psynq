@@ -29,6 +29,29 @@ From repo root:
 npx playwright test deploy/playwright/make_call.spec.ts --project=chromium
 ```
 
+Fast quality gate (recommended)
+
+This repo has a strict quality goal: **zero browser console warnings/errors** and **zero failing API calls** in the core UI flow.
+
+The test `deploy/playwright/console_gate.spec.ts` fails if:
+- the page emits any `console.warn` or `console.error`
+- any `fetch`/`xhr` request returns a 4xx/5xx
+- the page throws an unhandled error
+
+Run it container-only (recommended)
+
+This keeps execution fully containerized and uses a Playwright image with browsers preinstalled.
+
+```powershell
+docker compose -f deploy/playwright/docker-compose.playwright.yml run --rm playwright
+```
+
+If you need to override credentials without creating `deploy/playwright/.env`, you can pass env vars:
+
+```powershell
+$env:APP_URL="http://localhost:3000"; $env:USERNAME="sysadmin"; $env:PASSWORD="PsynqAdmin2025!!"; docker compose -f deploy/playwright/docker-compose.playwright.yml run --rm playwright
+```
+
 What the script does
 
 - Navigates to APP_URL

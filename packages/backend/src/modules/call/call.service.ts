@@ -378,8 +378,15 @@ export class CallService implements OnModuleInit {
   async endCall(callId: string): Promise<CallResponseDto> {
     const callEntity = await this.findCallEntityOrFail(callId);
     const call = this.entityToDomain(callEntity);
+
+    // Idempotent: if already ended, just return the current state
+    if (call.state === CallState.ENDED) {
+      return this.mapToResponseDto(call);
+    }
+
     try {
       this.stateMachine.endCall(call);
+
       await this.callRepository.save(this.domainToEntity(call));
       await this.telephonyProvider.endCall(call);
       await this.publishCallUpdate(this.mapToResponseDto(call));
@@ -525,13 +532,41 @@ export class CallService implements OnModuleInit {
   }
 
   private entityToDomain(entity: CallEntity): Call {
-    return plainToInstance(Call, instanceToPlain(entity), {
-      excludeExtraneousValues: true,
-    });
+    // Avoid class-transformer here: we observed cases where `id` was lost during
+    // conversions, which makes TypeORM treat updates as inserts and fail with
+    // `null value in column "id"`.
+    const call = new Call(entity.id, entity.from, entity.to, entity.direction);
+    call.organizationId = entity.organizationId ?? undefined;
+    call.state = entity.state;
+    call.agentId = entity.agentId ?? undefined;
+    call.externalId = entity.externalId ?? undefined;
+    call.externalParentId = entity.externalParentId ?? undefined;
+    call.providerMetadata = entity.providerMetadata ?? undefined;
+    call.startedAt = entity.startedAt ?? undefined;
+    call.answeredAt = entity.answeredAt ?? undefined;
+    call.endedAt = entity.endedAt ?? undefined;
+    return call;
   }
 
   private domainToEntity(call: Call): CallEntity {
-    return plainToInstance(CallEntity, instanceToPlain(call));
+    // Manual mapping to ensure all properties are preserved
+    const entity = new CallEntity();
+    entity.id = call.id;
+    if (call.organizationId) {
+      entity.organizationId = call.organizationId;
+    }
+    entity.state = call.state;
+    entity.direction = call.direction;
+    entity.from = call.from;
+    entity.to = call.to;
+    entity.agentId = call.agentId;
+    entity.externalId = call.externalId;
+    entity.providerMetadata = call.providerMetadata;
+    entity.externalParentId = call.externalParentId;
+    // Don't set startedAt (it's a CreateDateColumn, managed by TypeORM)
+    entity.answeredAt = call.answeredAt;
+    entity.endedAt = call.endedAt;
+    return entity;
   }
 
   private async cleanupRelatedActiveCalls(call: Call) {

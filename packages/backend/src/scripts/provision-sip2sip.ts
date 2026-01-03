@@ -45,7 +45,7 @@ async function provision() {
   await qr.query(
     `
     INSERT INTO ps_endpoints (
-        id, transport, aors, auth, context,
+        id, transport, aors, auths, context,
         disallow, allow, rewrite_contact, force_rport,
         rtp_symmetric
     ) VALUES (
@@ -53,7 +53,7 @@ async function provision() {
         'all', 'ulaw,opus', 'yes', 'yes',
         'yes'
     )
-    ON CONFLICT (id) DO UPDATE SET auth = $3
+    ON CONFLICT (id) DO UPDATE SET auths = $3
   `,
     [SIP2SIP_TRUNK_ID, SIP2SIP_TRUNK_ID, `${SIP2SIP_TRUNK_ID}-auth`],
   );

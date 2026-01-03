@@ -108,8 +108,19 @@ export const useCallStore = create<CallStore>((set, get) => ({
     set({ isLoading: true });
     try {
       const fetchedCalls = await apiAdapter.getActiveCalls(authToken);
+      // Defensive: the backend (or transport) can occasionally produce duplicates.
+      // Dedupe here to avoid React key warnings and inconsistent UI state.
+      const calls = Array.isArray(fetchedCalls) ? fetchedCalls : [];
+      const seenIds = new Set<string>();
+      const dedupedCalls = calls.filter((c) => {
+        const id = (c as any)?.id as string | undefined;
+        if (!id) return true; // keep id-less calls; UI uses an index-based key fallback
+        if (seenIds.has(id)) return false;
+        seenIds.add(id);
+        return true;
+      });
       set({ 
-        calls: Array.isArray(fetchedCalls) ? fetchedCalls : [], 
+        calls: dedupedCalls,
         isLoading: false 
       });
     } catch (error) {

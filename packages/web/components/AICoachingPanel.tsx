@@ -23,14 +23,15 @@ export function AICoachingPanel({ tips, isAudioReady = false }: AICoachingPanelP
             {isAudioReady ? 'Waiting for call audio to provide real-time tips...' : 'Call audio unavailable. Retry telephony to enable live coaching.'}
           </div>
         ) : (
-          tips.map((tip) => (
-            <div key={tip.id} className="bg-white p-3 rounded-lg shadow-sm border border-blue-200 animate-in slide-in-from-right duration-300">
-              <p className="text-sm text-gray-800 leading-snug">{tip.text}</p>
-              <span className="text-[10px] text-gray-400 mt-2 block">
-                {tip.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </span>
-            </div>
-          ))
+          tips.map((tip) => {
+            const time = new Date(tip.timestamp).toISOString().substr(11, 8); // HH:MM:SS in UTC (deterministic)
+            return (
+              <div key={tip.id} className="bg-white p-3 rounded-lg shadow-sm border border-blue-200 animate-in slide-in-from-right duration-300">
+                <p className="text-sm text-gray-800 leading-snug">{tip.text}</p>
+                <span className="text-[10px] text-gray-400 mt-2 block">{time}</span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

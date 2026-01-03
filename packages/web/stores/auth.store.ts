@@ -22,7 +22,7 @@ interface AuthActions {
   updateAgentStatus: (status: AgentStatus) => Promise<void>;
   fetchAgentStatus: () => Promise<void>;
   isAuthenticated: () => boolean;
-  refreshToken: () => Promise<void>;
+  refreshAuthToken: () => Promise<void>;
   shouldRefreshToken: () => boolean;
 }
 
@@ -57,7 +57,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
           const decoded = apiAdapter?.decodeToken(token);
           const now = Date.now() / 1000;
           if (decoded && decoded.exp && decoded.exp < now) {
-            console.warn('Stale token found in localStorage, clearing...');
             get().logout();
             return;
           }
@@ -91,7 +90,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await apiAdapter.login(username, password);
-      const decodedToken: any = apiAdapter.decodeToken(response.access_token);
+      const decodedToken: any = apiAdapter.decodeToken(response.accessToken);
       const user = {
         id: decodedToken.sub,
         username: decodedToken.username,
@@ -100,16 +99,16 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       };
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('jwt_token', response.access_token);
-        localStorage.setItem('refresh_token', response.refresh_token);
+        localStorage.setItem('jwt_token', response.accessToken);
+        localStorage.setItem('refresh_token', response.refreshToken);
         localStorage.setItem('user_data', JSON.stringify(user));
       }
 
       set({
         isLoggedIn: true,
         user,
-        token: response.access_token,
-        refreshToken: response.refresh_token,
+        token: response.accessToken,
+        refreshToken: response.refreshToken,
         tokenExpiresAt: decodedToken.exp * 1000,
         isLoading: false,
       });
@@ -186,7 +185,6 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       const decoded = apiAdapter.decodeToken(token);
       const now = Date.now() / 1000;
       if (decoded.exp && decoded.exp < now) {
-        console.warn('Token expired:', new Date(decoded.exp * 1000));
         return false;
       }
       return true;
@@ -206,7 +204,7 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
     return timeUntilExpiry < 5 * 60 * 1000; // 5 minutes in milliseconds
   },
 
-  refreshToken: async () => {
+  refreshAuthToken: async () => {
     const { refreshToken: currentRefreshToken } = get();
     if (!currentRefreshToken || !apiAdapter) {
       throw new Error('No refresh token available');
@@ -224,20 +222,20 @@ export const useAuthStore = create<AuthState & AuthActions>((set, get) => ({
       }
 
       const data = await response.json();
-      const decodedToken: any = apiAdapter.decodeToken(data.access_token);
+      const decodedToken: any = apiAdapter.decodeToken(data.accessToken);
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('jwt_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
+        localStorage.setItem('jwt_token', data.accessToken);
+        localStorage.setItem('refresh_token', data.refreshToken);
       }
 
       set({
-        token: data.access_token,
-        refreshToken: data.refresh_token,
+        token: data.accessToken,
+        refreshToken: data.refreshToken,
         tokenExpiresAt: decodedToken.exp * 1000,
       });
 
-      return data.access_token;
+      return data.accessToken;
     } catch (error) {
       console.error('Token refresh failed:', error);
       get().logout();

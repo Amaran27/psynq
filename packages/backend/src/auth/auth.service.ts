@@ -2,8 +2,6 @@ import {
   Injectable,
   ConflictException,
   UnauthorizedException,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,7 +10,6 @@ import { hash, compare, genSalt } from 'bcrypt';
 import { UserEntity, UserRole } from '../entities/user.entity';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { AgentStatus } from '@psynq/core';
-import { CallService } from '../modules/call/call.service';
 
 @Injectable()
 export class AuthService {
@@ -20,8 +17,6 @@ export class AuthService {
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly jwtService: JwtService,
-    @Inject(forwardRef(() => CallService))
-    private readonly callService: CallService,
   ) {}
 
   /**

@@ -121,6 +121,7 @@ services:
     working_dir: /usr/src/app/packages/backend
     volumes:
       - ./packages/backend/src:/usr/src/app/packages/backend/src:cached
+      - ./packages/backend/test:/usr/src/app/packages/backend/test:cached
       - ./packages/backend/tsconfig.json:/usr/src/app/packages/backend/tsconfig.json:cached
       - ./packages/backend/nest-cli.json:/usr/src/app/packages/backend/nest-cli.json:cached
       - ./packages/core/dist:/usr/src/app/packages/core/dist:cached

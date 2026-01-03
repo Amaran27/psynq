@@ -165,15 +165,15 @@ export class ApiClientService {
       }
 
       const data = await response.json();
-      const { access_token, refresh_token: newRefreshToken } = data;
+      const { accessToken, refreshToken: newRefreshToken } = data;
 
       // Store new tokens
-      this.setTokens(access_token, newRefreshToken);
+      this.setTokens(accessToken, newRefreshToken);
 
       // Notify all subscribers
-      this.notifyRefreshSubscribers(access_token);
+      this.notifyRefreshSubscribers(accessToken);
 
-      return access_token;
+      return accessToken;
     } catch (error) {
       console.error('Token refresh failed:', error);
       this.clearTokens();

@@ -36,10 +36,10 @@ export class HttpCallApiAdapter implements CallApiPort {
   }
 
   async login(username: string, password: string): Promise<{ 
-    access_token: string; 
-    refresh_token: string; 
-    expires_in: number; 
-    token_type: string;
+    accessToken: string; 
+    refreshToken: string; 
+    expiresIn: number; 
+    tokenType: string;
   }> {
     const response = await fetch(`${this.baseUrl}/auth/login`, {
       method: 'POST',
@@ -55,10 +55,10 @@ export class HttpCallApiAdapter implements CallApiPort {
   }
 
   async refreshToken(refreshToken: string): Promise<{ 
-    access_token: string; 
-    refresh_token: string; 
-    expires_in: number; 
-    token_type: string;
+    accessToken: string; 
+    refreshToken: string; 
+    expiresIn: number; 
+    tokenType: string;
   }> {
     const response = await fetch(`${this.baseUrl}/auth/refresh`, {
       method: 'POST',
@@ -172,11 +172,12 @@ export class HttpCallApiAdapter implements CallApiPort {
     this.socket.on('connect_error', (error) => {
       // Only log the first error to avoid spam
       if (!this.socket?.connected) {
-        console.warn(
-          '%c[HttpCallApiAdapter] ⚠️ WebSocket connection failed (will retry automatically)',
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(
+          '%c[HttpCallApiAdapter] WebSocket connection not ready yet (will retry automatically)',
           'color: #FF9800; font-style: italic'
         );
-        console.log('[HttpCallApiAdapter] This is normal if backend is still starting up...');
+        console.log('[HttpCallApiAdapter] Details:', message);
       }
     });
 

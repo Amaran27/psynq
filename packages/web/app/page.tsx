@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { CallCenterContainer } from '../containers/CallCenterContainer';
+import CallCenterClientLoader from '../components/CallCenterClientLoader';
 
 export default function Home() {
-  return <CallCenterContainer />;
+  return <CallCenterClientLoader />;
 }

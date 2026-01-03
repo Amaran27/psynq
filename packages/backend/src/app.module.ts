@@ -53,7 +53,7 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
         username: configService.get<string>('DB_USERNAME') || 'psynq_user',
         password:
           configService.get<string>('DB_PASSWORD') || 'mysecretpassword',
-        database: configService.get<string>('DB_DATABASE') || 'psynq_db',
+        database: configService.get<string>('DB_DATABASE') || 'psynq',
         entities: [
           CallEntity,
           UserEntity,

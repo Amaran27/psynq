@@ -60,10 +60,13 @@ export class TypeOrmAuthRepository implements IAuthRepository {
     status: string,
     timestamp: Date,
   ): Promise<void> {
-    await this.repository.update(userId, {
-      status: status as any,
-      lastStatusChangedAt: timestamp,
-    });
+    await this.repository.update(
+      { id: userId },
+      {
+        status: status as any,
+        lastStatusChangedAt: timestamp,
+      },
+    );
   }
 
   async usernameExists(username: string): Promise<boolean> {

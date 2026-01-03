@@ -278,9 +278,9 @@ export function CallCenterView({
                   No active calls in queue
                 </div>
               ) : (
-                calls.map((call) => (
+                calls.map((call, idx) => (
                   <div 
-                    key={call.id}
+                    key={call.id ? `call-${call.id}` : `call-idx-${idx}`}
                     onClick={() => onSelectCall(call.id)}
                     className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-colors ${currentCall?.id === call.id ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`}
                   >

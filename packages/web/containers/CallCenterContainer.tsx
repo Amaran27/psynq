@@ -46,9 +46,6 @@ export function CallCenterContainer() {
 
   const { initializeAdapter, apiAdapter, initializeAudioAdapterOnDemand } = useAdapterStore();
 
-  // Check if we have a stored token before first render (prevents login flash)
-  const hasStoredToken = typeof window !== 'undefined' ? !!localStorage.getItem('jwt_token') : false;
-
   // Initialize API adapter
   useEffect(() => {
     initializeAdapter();
@@ -107,7 +104,7 @@ export function CallCenterContainer() {
         unsubscribeNewCalls();
       };
     }
-  }, [isLoggedIn, token, user, apiAdapter, initializeTelephony, loadActiveCalls, fetchAgentStatus, updateCall, addCall, isAuthenticated, logout]);
+  }, [isLoggedIn, token, user, apiAdapter, initializeTelephony, loadActiveCalls, fetchAgentStatus, updateCall, addCall, isAuthenticated, logout, initializeAudioAdapterOnDemand]);
 
   const handleLogin = async (username: string, password: string) => {
     try {
@@ -190,17 +187,8 @@ export function CallCenterContainer() {
     }
   };
 
-  if (!isLoggedIn && !hasStoredToken) {
+  if (!isLoggedIn) {
     return <LoginScreen onLogin={handleLogin} isLoading={authLoading} error={authError} />;
-  }
-
-  // Show loading state while hydrating auth from localStorage
-  if (!isLoggedIn && hasStoredToken) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-900 text-white text-xl">
-        Loading...
-      </div>
-    );
   }
 
   return (

@@ -24,7 +24,8 @@
     "migration:run": "node -r ts-node/register ./node_modules/typeorm/cli.js migration:run -d src/data-source.ts",
     "migration:revert": "node -r ts-node/register ./node_modules/typeorm/cli.js migration:revert -d src/data-source.ts",
     "migration:check": "node scripts/check-migration-drift.js",
-    "seed": "node -r ts-node/register src/scripts/seed-system.ts"
+    "seed": "node -r ts-node/register src/scripts/seed-system.ts",
+    "seed:calls": "node -r ts-node/register src/scripts/seed-calls.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.956.0",

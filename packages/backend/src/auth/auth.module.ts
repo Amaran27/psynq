@@ -8,8 +8,8 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { LocalStrategy } from './local.strategy';
 import { JwtStrategy } from './jwt.strategy';
-import { forwardRef } from '@nestjs/common';
-import { CallModule } from '../modules/call/call.module';
+// NOTE: Auth should not depend on CallModule. CallModule may depend on AuthModule,
+// but keeping this one-way avoids circular dependencies and makes isolated auth tests possible.
 
 // Hexagonal Architecture Imports
 import { RegisterUseCase } from './application/register.usecase';
@@ -45,7 +45,6 @@ import {
       },
       inject: [ConfigService],
     }),
-    forwardRef(() => CallModule), // Resolve circular dependency with CallModule
   ],
   controllers: [AuthController],
   providers: [
