@@ -1,0 +1,9 @@
+{
+  "campaignId": "campaign-id-placeholder",
+  "phoneNumber": "+1234567890",
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@example.com",
+  "status": "NEW",
+  "priority": "HIGH"
+}

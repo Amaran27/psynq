@@ -1,0 +1,7 @@
+{
+  "name": "Test Campaign",
+  "description": "Integration test campaign for API verification",
+  "type": "OUTBOUND",
+  "status": "DRAFT",
+  "organizationId": "3becbe7e-64dc-4121-99a8-1c5c30eb5a45"
+}
