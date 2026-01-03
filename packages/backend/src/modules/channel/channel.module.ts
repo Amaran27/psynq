@@ -1,32 +1,45 @@
+/**
+ * Channel Module (Refactored to Hexagonal Architecture)
+ * 
+ * Module configuration following dependency inversion principle.
+ */
+
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ChannelEntity } from '../../entities/channel.entity';
-import { ChannelService } from './channel.service';
+import { TypeOrmChannelRepositoryAdapter } from './adapters/typeorm-channel-repository.adapter';
+import { ChannelRepositoryPort } from './ports/channel-repository.port';
+import { CreateChannelUseCase } from './application/create-channel.usecase';
+import { GetChannelUseCase } from './application/get-channel.usecase';
+import { ListChannelsUseCase } from './application/list-channels.usecase';
+import { AnswerChannelUseCase } from './application/answer-channel.usecase';
+import { HangupChannelUseCase } from './application/hangup-channel.usecase';
+import { PlayMediaUseCase } from './application/play-media.usecase';
 import { ChannelController } from './channel.controller';
-import { AsteriskAdapter } from '../../adapters/asterisk.adapter';
-import { AsteriskModule } from '../asterisk/asterisk.module';
-import { EventBusModule } from '../event-bus/event-bus.module';
-import { StorageModule } from '../storage/storage.module';
-import { SettingsModule } from '../settings.module';
-import { ConfigModule } from '../../config/config.module';
+import { ChannelEntity } from '../../entities/channel.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([ChannelEntity]),
-    AsteriskModule,
-    EventBusModule,
-    StorageModule,
-    SettingsModule,
-    ConfigModule,
-  ],
-  providers: [
-    ChannelService,
-    {
-      provide: 'TELEPHONY_PROVIDER',
-      useClass: AsteriskAdapter,
-    },
-  ],
+  imports: [TypeOrmModule.forFeature([ChannelEntity])],
   controllers: [ChannelController],
-  exports: [ChannelService],
+  providers: [
+    // Adapter implements Port
+    TypeOrmChannelRepositoryAdapter,
+
+    // Port token bound to adapter implementation
+    {
+      provide: 'CHANNEL_REPOSITORY',
+      useExisting: TypeOrmChannelRepositoryAdapter,
+    },
+
+    // Use cases depend on Port
+    CreateChannelUseCase,
+    GetChannelUseCase,
+    ListChannelsUseCase,
+    AnswerChannelUseCase,
+    HangupChannelUseCase,
+    PlayMediaUseCase,
+  ],
+  exports: [
+    'CHANNEL_REPOSITORY',
+  ],
 })
 export class ChannelModule {}

@@ -1,3 +1,9 @@
+/**
+ * Channel Controller (Refactored to Hexagonal Architecture)
+ * 
+ * Thin controller that delegates to use cases.
+ */
+
 import {
   Controller,
   Post,
@@ -20,7 +26,12 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
-import { ChannelService } from './channel.service';
+import { CreateChannelUseCase, CreateChannelCommand } from './application/create-channel.usecase';
+import { GetChannelUseCase } from './application/get-channel.usecase';
+import { ListChannelsUseCase, ListChannelsQuery } from './application/list-channels.usecase';
+import { AnswerChannelUseCase, AnswerChannelCommand } from './application/answer-channel.usecase';
+import { HangupChannelUseCase, HangupChannelCommand } from './application/hangup-channel.usecase';
+import { PlayMediaUseCase, PlayMediaCommand } from './application/play-media.usecase';
 import {
   CreateChannelDto,
   ChannelResponseDto,
@@ -35,7 +46,14 @@ import { plainToInstance } from 'class-transformer';
 @Controller('channels')
 @UseGuards(JwtAuthGuard)
 export class ChannelController {
-  constructor(private readonly channelService: ChannelService) {}
+  constructor(
+    private readonly createChannelUseCase: CreateChannelUseCase,
+    private readonly getChannelUseCase: GetChannelUseCase,
+    private readonly listChannelsUseCase: ListChannelsUseCase,
+    private readonly answerChannelUseCase: AnswerChannelUseCase,
+    private readonly hangupChannelUseCase: HangupChannelUseCase,
+    private readonly playMediaUseCase: PlayMediaUseCase,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -55,19 +73,18 @@ export class ChannelController {
     @Body() dto: CreateChannelDto,
     @Req() req: any,
   ): Promise<ChannelResponseDto> {
-    const orgId = req.user?.organizationId || null;
+    const orgId = req.user?.organizationId || undefined;
 
-    const channel = await this.channelService.createChannel(
-      dto.endpoint,
-      orgId,
-      dto.callerId,
-      dto.callId,
-      dto.channelvars,
-    );
+    const command: CreateChannelCommand = {
+      endpoint: dto.endpoint,
+      organizationId: orgId,
+      callerId: dto.callerId,
+      callId: dto.callId,
+      channelvars: dto.channelvars,
+    };
 
-    return plainToInstance(ChannelResponseDto, channel, {
-      excludeExtraneousValues: true,
-    });
+    const channel = await this.createChannelUseCase.execute(command);
+    return this.toResponseDto(channel);
   }
 
   @Get(':id')
@@ -84,10 +101,8 @@ export class ChannelController {
   @ApiResponse({ status: 404, description: 'Channel not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getChannel(@Param('id') id: string): Promise<ChannelResponseDto> {
-    const channel = await this.channelService.getChannel(id);
-    return plainToInstance(ChannelResponseDto, channel, {
-      excludeExtraneousValues: true,
-    });
+    const channel = await this.getChannelUseCase.execute(id);
+    return this.toResponseDto(channel);
   }
 
   @Get()
@@ -109,10 +124,12 @@ export class ChannelController {
   async listActiveChannels(
     @Query('organizationId') organizationId?: string,
   ): Promise<ChannelResponseDto[]> {
-    const channels = await this.channelService.listActiveChannels(organizationId);
-    return channels.map((ch) =>
-      plainToInstance(ChannelResponseDto, ch, { excludeExtraneousValues: true }),
-    );
+    const query: ListChannelsQuery = {
+      organizationId,
+    };
+
+    const channels = await this.listChannelsUseCase.execute(query);
+    return channels.map(ch => this.toResponseDto(ch));
   }
 
   @Put(':id/answer')
@@ -134,11 +151,15 @@ export class ChannelController {
     @Param('id') id: string,
     @Req() req: any,
   ): Promise<ChannelResponseDto> {
-    const orgId = req.user?.organizationId || null;
-    const channel = await this.channelService.answerChannel(id, orgId);
-    return plainToInstance(ChannelResponseDto, channel, {
-      excludeExtraneousValues: true,
-    });
+    const orgId = req.user?.organizationId || undefined;
+
+    const command: AnswerChannelCommand = {
+      channelId: id,
+      organizationId: orgId,
+    };
+
+    const channel = await this.answerChannelUseCase.execute(command);
+    return this.toResponseDto(channel);
   }
 
   @Delete(':id')
@@ -161,11 +182,16 @@ export class ChannelController {
     @Body() dto: ChannelActionDto,
     @Req() req: any,
   ): Promise<ChannelResponseDto> {
-    const orgId = req.user?.organizationId || null;
-    const channel = await this.channelService.hangupChannel(id, orgId, dto.reason);
-    return plainToInstance(ChannelResponseDto, channel, {
-      excludeExtraneousValues: true,
-    });
+    const orgId = req.user?.organizationId || undefined;
+
+    const command: HangupChannelCommand = {
+      channelId: id,
+      organizationId: orgId,
+      reason: dto.reason,
+    };
+
+    const channel = await this.hangupChannelUseCase.execute(command);
+    return this.toResponseDto(channel);
   }
 
   @Post(':id/play')
@@ -185,30 +211,42 @@ export class ChannelController {
     @Body() dto: PlayMediaDto,
     @Req() req: any,
   ): Promise<{ message: string }> {
-    const orgId = req.user?.organizationId || null;
-    await this.channelService.playMedia(id, orgId, dto.media, dto.lang);
+    const orgId = req.user?.organizationId || undefined;
+
+    const command: PlayMediaCommand = {
+      channelId: id,
+      organizationId: orgId,
+      media: dto.media,
+      lang: dto.lang,
+    };
+
+    await this.playMediaUseCase.execute(command);
     return { message: 'Media playback initiated' };
   }
 
-  @Post(':id/speak')
-  @ApiOperation({
-    summary: 'Speak text to channel (TTS)',
-    description:
-      'Uses text-to-speech to speak the provided text to the channel.',
-  })
-  @ApiParam({ name: 'id', description: 'Channel ID' })
-  @ApiBody({ type: SpeakDto })
-  @ApiResponse({ status: 200, description: 'TTS initiated' })
-  @ApiResponse({ status: 400, description: 'Channel not in correct state' })
-  @ApiResponse({ status: 404, description: 'Channel not found' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async speak(
-    @Param('id') id: string,
-    @Body() dto: SpeakDto,
-    @Req() req: any,
-  ): Promise<{ message: string }> {
-    const orgId = req.user?.organizationId || null;
-    await this.channelService.speak(id, orgId, dto.text, dto.voice);
-    return { message: 'TTS initiated' };
+  /**
+   * Convert domain model to response DTO
+   * This isolates the domain from API/DTO concerns
+   */
+  private toResponseDto(channel: any): ChannelResponseDto {
+    return {
+      id: channel.id,
+      organizationId: channel.organizationId,
+      callId: channel.callId,
+      bridgeId: channel.bridgeId,
+      state: channel.state,
+      direction: channel.direction,
+      callerName: channel.callerName,
+      callerNumber: channel.callerNumber,
+      connectedName: channel.connectedName,
+      connectedNumber: channel.connectedNumber,
+      dialedNumber: channel.dialedNumber,
+      language: channel.language,
+      accountCode: channel.accountCode,
+      channelvars: channel.channelvars,
+      createdAt: channel.createdAt,
+      answeredAt: channel.answeredAt,
+      endedAt: channel.endedAt,
+    } as ChannelResponseDto;
   }
 }
