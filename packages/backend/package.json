@@ -26,7 +26,8 @@
     "migration:check": "node scripts/check-migration-drift.js",
     "seed": "node -r ts-node/register src/scripts/seed-system.ts",
     "seed:calls": "node -r ts-node/register src/scripts/seed-calls.ts",
-    "seed:channels": "node -r ts-node/register src/scripts/seed-channels.ts"
+    "seed:channels": "node -r ts-node/register src/scripts/seed-channels.ts",
+    "seed:bridges": "node -r ts-node/register src/scripts/seed-bridges.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.956.0",

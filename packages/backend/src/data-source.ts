@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { CallEntity } from './entities/call.entity';
 import { ChannelEntity } from './entities/channel.entity';
+import { BridgeEntity } from './entities/bridge.entity';
 import { UserEntity } from './entities/user.entity';
 import { CallParticipantEntity } from './entities/call-participant.entity';
 import { RecordingEntity } from './entities/recording.entity';
@@ -23,6 +24,7 @@ const AppDataSource = new DataSource({
   entities: [
     CallEntity,
     ChannelEntity,
+    BridgeEntity,
     UserEntity,
     CallParticipantEntity,
     RecordingEntity,
