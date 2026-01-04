@@ -58,6 +58,11 @@ import { ReportExecutionEntity } from './entities/reports/report-execution.entit
 import { CrmModule } from './modules/crm/crm.module';
 import { CrmIntegrationEntity } from './modules/crm/infrastructure/persistence/crm-integration.entity';
 import { SalesforceConnectionEntity } from './modules/crm/infrastructure/persistence/salesforce-connection.entity';
+import { RatingModule } from './rating/rating.module';
+import { RatePlanEntity } from './modules/rating/infrastructure/persistence/rate-plan.entity';
+import { CustomerWalletEntity } from './modules/rating/infrastructure/persistence/customer-wallet.entity';
+import { UsageRecordEntity } from './modules/rating/infrastructure/persistence/usage-record.entity';
+import { RatingBatchEntity } from './modules/rating/infrastructure/persistence/rating-batch.entity';
 
 @Module({
   imports: [
@@ -110,6 +115,10 @@ import { SalesforceConnectionEntity } from './modules/crm/infrastructure/persist
           ReportExecutionEntity,
           CrmIntegrationEntity,
           SalesforceConnectionEntity,
+          RatePlanEntity,
+          CustomerWalletEntity,
+          UsageRecordEntity,
+          RatingBatchEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -140,6 +149,7 @@ import { SalesforceConnectionEntity } from './modules/crm/infrastructure/persist
     UserModule,
     ReportsModule,
     CrmModule,
+    RatingModule,
     // RecordingsModule, // Temporarily disabled - missing minio module
   ],
   controllers: [AppController, SettingsController, SystemSettingsController],
