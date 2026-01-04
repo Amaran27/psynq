@@ -76,6 +76,7 @@ export class WhatsAppService {
     // Send via provider
     try {
       const result = await this.provider.sendMessage({
+        organizationId: dto.organizationId!,
         to: dto.to,
         type: dto.type,
         content: dto.content,
@@ -141,6 +142,7 @@ export class WhatsAppService {
     // Send via provider
     try {
       const result = await this.provider.sendTemplateMessage(
+        organizationId,
         dto.to,
         dto.templateName,
         dto.language,
@@ -181,9 +183,9 @@ export class WhatsAppService {
     return this.messageRepository.findByConversation(conversationId);
   }
 
-  async handleWebhook(payload: any, signature: string): Promise<void> {
+  async handleWebhook(organizationId: string, payload: any, signature: string): Promise<void> {
     // Verify webhook signature
-    if (!this.provider.verifyWebhook(payload, signature)) {
+    if (!(await this.provider.verifyWebhook(organizationId, payload, signature))) {
       throw new Error('Invalid webhook signature');
     }
 

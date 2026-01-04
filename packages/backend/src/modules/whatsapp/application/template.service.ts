@@ -86,6 +86,7 @@ export class TemplateService {
       this.logger.log(`Submitting template ${template.name} to WhatsApp`);
       
       const result = await this.provider.submitTemplate({
+        organizationId: template.organizationId,
         name: template.name,
         category: template.category,
         language: template.language,
@@ -114,7 +115,7 @@ export class TemplateService {
     }
 
     try {
-      const status = await this.provider.getTemplateStatus(template.externalTemplateId);
+      const status = await this.provider.getTemplateStatus(template.organizationId, template.externalTemplateId);
 
       if (status.status === 'APPROVED') {
         template.markAsApproved(template.externalTemplateId, template.externalTemplateName);

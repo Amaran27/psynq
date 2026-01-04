@@ -81,8 +81,10 @@ export class WhatsAppMessageController {
   @Post('webhook')
   @ApiOperation({ summary: 'WhatsApp webhook endpoint (Meta)' })
   @ApiResponse({ status: HttpStatus.OK, description: 'Webhook processed' })
-  async handleWebhook(@Body() payload: any, @Headers('x-hub-signature-256') signature: string) {
-    await this.whatsappService.handleWebhook(payload, signature);
+  async handleWebhook(@Request() req, @Body() payload: any, @Headers('x-hub-signature-256') signature: string) {
+    // Extract organizationId from request (webhook calls should include auth)
+    const organizationId = req.user?.organizationId || 'default';
+    await this.whatsappService.handleWebhook(organizationId, payload, signature);
     return { status: 'ok' };
   }
 

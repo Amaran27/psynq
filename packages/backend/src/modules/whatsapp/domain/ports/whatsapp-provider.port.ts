@@ -5,6 +5,7 @@ export enum WhatsAppProviderType {
 }
 
 export interface SendMessageRequest {
+  organizationId: string; // Required for database configuration lookup
   to: string;
   type: string;
   content: Record<string, any>;
@@ -32,6 +33,7 @@ export interface WebhookPayload {
 }
 
 export interface TemplateSubmitRequest {
+  organizationId: string; // Required for database configuration lookup
   name: string;
   category: string;
   language: string;
@@ -47,12 +49,12 @@ export interface TemplateSubmitResult {
 export interface WhatsAppProvider {
   getProviderType(): WhatsAppProviderType;
   sendMessage(request: SendMessageRequest): Promise<SendMessageResult>;
-  sendTemplateMessage(to: string, templateName: string, language: string, parameters: any[]): Promise<SendMessageResult>;
+  sendTemplateMessage(organizationId: string, to: string, templateName: string, language: string, parameters: any[]): Promise<SendMessageResult>;
   submitTemplate(request: TemplateSubmitRequest): Promise<TemplateSubmitResult>;
-  getTemplateStatus(templateId: string): Promise<{ status: string; rejectionReason?: string }>;
-  verifyWebhook(payload: any, signature: string): boolean;
+  getTemplateStatus(organizationId: string, templateId: string): Promise<{ status: string; rejectionReason?: string }>;
+  verifyWebhook(organizationId: string, payload: any, signature: string): Promise<boolean>;
   parseWebhook(payload: any): WebhookPayload[];
-  isAvailable(): Promise<boolean>;
+  isAvailable(organizationId: string): Promise<boolean>;
 }
 
 export const WHATSAPP_PROVIDER_PORT = Symbol('WHATSAPP_PROVIDER_PORT');

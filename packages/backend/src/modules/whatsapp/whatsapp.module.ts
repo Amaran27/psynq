@@ -6,6 +6,7 @@ import { HttpModule } from '@nestjs/axios';
 import { WhatsAppMessageEntity } from './infrastructure/persistence/typeorm/entities/whatsapp-message.entity';
 import { WhatsAppTemplateEntity } from './infrastructure/persistence/typeorm/entities/whatsapp-template.entity';
 import { WhatsAppContactEntity } from './infrastructure/persistence/typeorm/entities/whatsapp-contact.entity';
+import { WhatsAppConfigurationEntity } from './infrastructure/persistence/typeorm/entities/whatsapp-configuration.entity';
 
 // Port tokens
 import {
@@ -25,11 +26,13 @@ import { MetaWhatsAppProviderAdapter } from './infrastructure/adapters/meta-what
 import { WhatsAppService } from './application/whatsapp.service';
 import { TemplateService } from './application/template.service';
 import { ContactService } from './application/contact.service';
+import { ConfigurationService } from './application/configuration.service';
 
 // Controllers
 import { WhatsAppMessageController } from './presentation/whatsapp-message.controller';
 import { WhatsAppTemplateController } from './presentation/whatsapp-template.controller';
 import { WhatsAppContactController } from './presentation/whatsapp-contact.controller';
+import { WhatsAppConfigurationController } from './presentation/whatsapp-configuration.controller';
 
 @Module({
   imports: [
@@ -37,6 +40,7 @@ import { WhatsAppContactController } from './presentation/whatsapp-contact.contr
       WhatsAppMessageEntity,
       WhatsAppTemplateEntity,
       WhatsAppContactEntity,
+      WhatsAppConfigurationEntity,
     ]),
     HttpModule,
   ],
@@ -44,6 +48,7 @@ import { WhatsAppContactController } from './presentation/whatsapp-contact.contr
     WhatsAppMessageController,
     WhatsAppTemplateController,
     WhatsAppContactController,
+    WhatsAppConfigurationController,
   ],
   providers: [
     // Repository adapters
@@ -68,7 +73,8 @@ import { WhatsAppContactController } from './presentation/whatsapp-contact.contr
     WhatsAppService,
     TemplateService,
     ContactService,
+    ConfigurationService,
   ],
-  exports: [WhatsAppService, TemplateService, ContactService],
+  exports: [WhatsAppService, TemplateService, ContactService, ConfigurationService],
 })
 export class WhatsAppModule {}

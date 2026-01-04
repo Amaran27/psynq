@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
@@ -11,12 +11,13 @@ import {
   TemplateSubmitRequest,
   TemplateSubmitResult,
 } from '../../domain/ports/whatsapp-provider.port';
+import { ConfigurationService } from '../../application/configuration.service';
 
 /**
  * Meta WhatsApp Business API Adapter
  * 
  * Integrates with Meta's WhatsApp Business Platform API
- * Requires: WHATSAPP_API_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_VERIFY_TOKEN
+ * Configuration is stored in database and managed via UI (no env vars)
  * 
  * API Documentation: https://developers.facebook.com/docs/whatsapp/cloud-api
  */
@@ -24,28 +25,37 @@ import {
 export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
   private readonly logger = new Logger(MetaWhatsAppProviderAdapter.name);
   private readonly apiBaseUrl = 'https://graph.facebook.com/v18.0';
-  private readonly apiToken: string;
-  private readonly phoneNumberId: string;
-  private readonly verifyToken: string;
 
-  constructor(private readonly httpService: HttpService) {
-    this.apiToken = process.env.WHATSAPP_API_TOKEN || '';
-    this.phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-    this.verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || '';
-
-    if (!this.apiToken || !this.phoneNumberId) {
-      this.logger.warn('WhatsApp API credentials not configured. Set WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID');
-    }
-  }
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configurationService: ConfigurationService,
+  ) {}
 
   getProviderType(): WhatsAppProviderType {
     return WhatsAppProviderType.META;
   }
 
   async sendMessage(request: SendMessageRequest): Promise<SendMessageResult> {
-    this.logger.log(`Sending ${request.type} message to ${request.to}`);
+    // Get configuration from database
+    const config = await this.configurationService.findByOrganization(request.organizationId);
+    
+    if (!config) {
+      throw new BadRequestException(
+        'WhatsApp not configured for this organization. Please configure in Settings > WhatsApp.',
+      );
+    }
 
-    const url = `${this.apiBaseUrl}/${this.phoneNumberId}/messages`;
+    if (!config.enabled) {
+      throw new BadRequestException('WhatsApp integration is disabled. Enable it in Settings.');
+    }
+
+    if (!config.allowOutbound) {
+      throw new BadRequestException('Outbound WhatsApp messages are disabled in settings.');
+    }
+
+    this.logger.log(`Sending ${request.type} message to ${request.to} (org: ${request.organizationId})`);
+
+    const url = `${this.apiBaseUrl}/${config.phoneNumberId}/messages`;
     const payload: any = {
       messaging_product: 'whatsapp',
       to: request.to,
@@ -85,9 +95,10 @@ export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
       const response = await firstValueFrom(
         this.httpService.post(url, payload, {
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
+            'Authorization': `Bearer ${config.accessToken}`,
             'Content-Type': 'application/json',
           },
+          timeout: config.apiTimeoutMs,
         }),
       );
 
@@ -109,12 +120,14 @@ export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
   }
 
   async sendTemplateMessage(
+    organizationId: string,
     to: string,
     templateName: string,
     language: string,
     parameters: any[],
   ): Promise<SendMessageResult> {
     return this.sendMessage({
+      organizationId,
       to,
       type: 'template',
       content: {},
@@ -127,13 +140,13 @@ export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
   async submitTemplate(request: TemplateSubmitRequest): Promise<TemplateSubmitResult> {
     this.logger.log(`Submitting template: ${request.name}`);
 
-    // Note: Template creation requires WhatsApp Business Account ID
-    const wabaid = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-    if (!wabaid) {
-      throw new Error('WHATSAPP_BUSINESS_ACCOUNT_ID not configured');
+    // Get configuration from database
+    const config = await this.configurationService.findByOrganization(request.organizationId);
+    if (!config || !config.businessAccountId) {
+      throw new BadRequestException('WhatsApp Business Account ID not configured');
     }
 
-    const url = `${this.apiBaseUrl}/${wabaid}/message_templates`;
+    const url = `${this.apiBaseUrl}/${config.businessAccountId}/message_templates`;
     const payload = {
       name: request.name,
       category: request.category,
@@ -145,9 +158,10 @@ export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
       const response = await firstValueFrom(
         this.httpService.post(url, payload, {
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
+            'Authorization': `Bearer ${config.accessToken}`,
             'Content-Type': 'application/json',
           },
+          timeout: config.apiTimeoutMs,
         }),
       );
 
@@ -162,15 +176,21 @@ export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
     }
   }
 
-  async getTemplateStatus(templateId: string): Promise<{ status: string; rejectionReason?: string }> {
+  async getTemplateStatus(organizationId: string, templateId: string): Promise<{ status: string; rejectionReason?: string }> {
+    const config = await this.configurationService.findByOrganization(organizationId);
+    if (!config) {
+      throw new BadRequestException('WhatsApp not configured');
+    }
+
     const url = `${this.apiBaseUrl}/${templateId}`;
 
     try {
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
+            'Authorization': `Bearer ${config.accessToken}`,
           },
+          timeout: config.apiTimeoutMs,
         }),
       );
 
@@ -184,20 +204,20 @@ export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
     }
   }
 
-  verifyWebhook(payload: any, signature: string): boolean {
+  async verifyWebhook(organizationId: string, payload: any, signature: string): Promise<boolean> {
     if (!signature) {
       return false;
     }
 
-    // Meta WhatsApp uses X-Hub-Signature-256 header
-    const appSecret = process.env.WHATSAPP_APP_SECRET || '';
-    if (!appSecret) {
-      this.logger.warn('WHATSAPP_APP_SECRET not configured, webhook verification disabled');
+    const config = await this.configurationService.findByOrganization(organizationId);
+    if (!config || !config.webhookVerifyToken) {
+      this.logger.warn('Webhook verify token not configured, verification disabled');
       return true; // Allow in development
     }
 
+    // Meta WhatsApp uses X-Hub-Signature-256 header
     const expectedSignature = crypto
-      .createHmac('sha256', appSecret)
+      .createHmac('sha256', config.webhookVerifyToken)
       .update(JSON.stringify(payload))
       .digest('hex');
 
@@ -298,18 +318,20 @@ export class MetaWhatsAppProviderAdapter implements WhatsAppProvider {
     return content;
   }
 
-  async isAvailable(): Promise<boolean> {
-    if (!this.apiToken || !this.phoneNumberId) {
+  async isAvailable(organizationId: string): Promise<boolean> {
+    const config = await this.configurationService.findByOrganization(organizationId);
+    if (!config || !config.enabled) {
       return false;
     }
 
     try {
-      const url = `${this.apiBaseUrl}/${this.phoneNumberId}`;
+      const url = `${this.apiBaseUrl}/${config.phoneNumberId}`;
       const response = await firstValueFrom(
         this.httpService.get(url, {
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
+            'Authorization': `Bearer ${config.accessToken}`,
           },
+          timeout: config.apiTimeoutMs,
         }),
       );
       return response.status === 200;

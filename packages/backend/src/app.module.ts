@@ -67,6 +67,7 @@ import { RatingBatchEntity } from './modules/rating/infrastructure/persistence/r
 import { WhatsAppMessageEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-message.entity';
 import { WhatsAppTemplateEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-template.entity';
 import { WhatsAppContactEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-contact.entity';
+import { WhatsAppConfigurationEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-configuration.entity';
 
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { WhatsAppContactEntity } from './modules/whatsapp/infrastructure/persist
           WhatsAppMessageEntity,
           WhatsAppTemplateEntity,
           WhatsAppContactEntity,
+          WhatsAppConfigurationEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
