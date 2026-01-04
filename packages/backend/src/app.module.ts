@@ -25,6 +25,7 @@ import { StorageModule } from './modules/storage/storage.module';
 import { AsteriskModule } from './modules/asterisk/asterisk.module';
 import { EventBusModule } from './modules/event-bus/event-bus.module';
 import { TranscriptionModule } from './modules/transcription/transcription.module';
+import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { TenantInterceptor } from './auth/tenant.interceptor';
 import { SettingsController } from './settings.controller';
@@ -63,6 +64,9 @@ import { RatePlanEntity } from './modules/rating/infrastructure/persistence/rate
 import { CustomerWalletEntity } from './modules/rating/infrastructure/persistence/customer-wallet.entity';
 import { UsageRecordEntity } from './modules/rating/infrastructure/persistence/usage-record.entity';
 import { RatingBatchEntity } from './modules/rating/infrastructure/persistence/rating-batch.entity';
+import { WhatsAppMessageEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-message.entity';
+import { WhatsAppTemplateEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-template.entity';
+import { WhatsAppContactEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-contact.entity';
 
 @Module({
   imports: [
@@ -119,6 +123,9 @@ import { RatingBatchEntity } from './modules/rating/infrastructure/persistence/r
           CustomerWalletEntity,
           UsageRecordEntity,
           RatingBatchEntity,
+          WhatsAppMessageEntity,
+          WhatsAppTemplateEntity,
+          WhatsAppContactEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -142,6 +149,7 @@ import { RatingBatchEntity } from './modules/rating/infrastructure/persistence/r
     AsteriskModule,
     EventBusModule,
     TranscriptionModule,
+    WhatsAppModule,
     MonitoringModule,
     WebhookModule,
     SettingsModule,
