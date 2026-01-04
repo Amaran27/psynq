@@ -342,3 +342,65 @@ export class DNCEntryResponseDto {
   @ApiPropertyOptional()
   expiresAt?: Date;
 }
+
+// Preview Dialer DTOs
+export class StartPreviewDialingDto {
+  @ApiProperty({ description: 'Campaign ID', example: 'uuid' })
+  @IsString()
+  campaignId: string;
+
+  @ApiProperty({ description: 'Agent IDs participating in the session', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  agentIds: string[];
+
+  @ApiPropertyOptional({ description: 'Max concurrent preview sessions', default: 10 })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  maxConcurrentSessions?: number;
+}
+
+export class SkipLeadDto {
+  @ApiProperty({ description: 'Lead ID to skip', example: 'uuid' })
+  @IsString()
+  leadId: string;
+
+  @ApiProperty({ description: 'Agent ID skipping the lead', example: 'uuid' })
+  @IsString()
+  agentId: string;
+
+  @ApiProperty({ description: 'Dialing session ID', example: 'uuid' })
+  @IsString()
+  dialingSessionId: string;
+
+  @ApiPropertyOptional({ description: 'Reason for skipping', example: 'Wrong timezone' })
+  @IsString()
+  @IsOptional()
+  reason?: string;
+}
+
+export class InitiatePreviewCallDto {
+  @ApiProperty({ description: 'Lead ID to call', example: 'uuid' })
+  @IsString()
+  leadId: string;
+
+  @ApiProperty({ description: 'Agent ID initiating the call', example: 'uuid' })
+  @IsString()
+  agentId: string;
+
+  @ApiProperty({ description: 'Dialing session ID', example: 'uuid' })
+  @IsString()
+  dialingSessionId: string;
+}
+
+export class PreviewCallResponseDto {
+  @ApiProperty({ description: 'Lead details', type: DialerLeadResponseDto })
+  lead: DialerLeadResponseDto;
+
+  @ApiProperty({ description: 'Whether call was initiated', example: true })
+  callInitiated: boolean;
+
+  @ApiProperty({ description: 'Status message', example: 'Call to +1234567890 initiated' })
+  message: string;
+}

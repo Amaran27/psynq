@@ -221,6 +221,20 @@ export class DialingSession {
   }
 
   /**
+   * Business Rule: Record call initiated (Preview mode)
+   */
+  recordCallInitiated(): void {
+    this.stats.callsAttempted++;
+  }
+
+  /**
+   * Business Rule: Record lead skipped (Preview mode)
+   */
+  recordLeadSkipped(): void {
+    this.stats.leadsProcessed++;
+  }
+
+  /**
    * Business Rule: Record answered call
    */
   recordCallAnswered(talkTimeSeconds: number): void {

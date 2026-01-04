@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DialerController } from './dialer.controller';
+import { PreviewDialerController } from './preview-dialer.controller';
 import { LeadEntity } from '../../entities/dialer/lead.entity';
 import { DialingSessionEntity } from '../../entities/dialer/dialing-session.entity';
 import { DNCEntryEntity } from '../../entities/dialer/dnc-entry.entity';
 import { CampaignEntity } from '../../entities/campaign.entity';
 import { EventBusModule } from '../event-bus/event-bus.module';
+import { CallModule } from '../call/call.module';
 
 // Ports
 import { LEAD_REPOSITORY_PORT } from './ports/lead-repository.port';
@@ -21,12 +23,20 @@ import { TypeOrmCampaignRepositoryAdapter } from '../campaign/adapters/typeorm-c
 
 // Use Cases
 import { StartProgressiveDialingUseCase } from './application/start-progressive-dialing.usecase';
+import { StartPreviewDialingUseCase } from './application/start-preview-dialing.usecase';
+import { StartPredictiveDialingUseCase } from './application/start-predictive-dialing.usecase';
+import { SkipLeadUseCase } from './application/skip-lead.usecase';
+import { InitiatePreviewCallUseCase } from './application/initiate-preview-call.usecase';
 import { AssignLeadToAgentUseCase } from './application/assign-lead-to-agent.usecase';
 import { RecordDialAttemptUseCase } from './application/record-dial-attempt.usecase';
 import { GetLeadPreviewUseCase } from './application/get-lead-preview.usecase';
 import { ImportLeadsUseCase } from './application/import-leads.usecase';
 import { CheckDNCUseCase } from './application/check-dnc.usecase';
 import { AddToDNCListUseCase } from './application/add-to-dnc-list.usecase';
+
+// Services
+import { PredictivePacerService } from './application/predictive-pacer.service';
+import { PredictiveDialingService } from './application/predictive-dialing.service';
 
 /**
  * Dialer Module (Hexagonal Architecture)
@@ -47,8 +57,9 @@ import { AddToDNCListUseCase } from './application/add-to-dnc-list.usecase';
       CampaignEntity,
     ]),
     EventBusModule,
+    CallModule,
   ],
-  controllers: [DialerController],
+  controllers: [DialerController, PreviewDialerController],
   providers: [
     // Bind ports to adapters
     {
@@ -69,16 +80,27 @@ import { AddToDNCListUseCase } from './application/add-to-dnc-list.usecase';
     },
     // Register use cases
     StartProgressiveDialingUseCase,
+    StartPreviewDialingUseCase,
+    StartPredictiveDialingUseCase,
+    SkipLeadUseCase,
+    InitiatePreviewCallUseCase,
     AssignLeadToAgentUseCase,
     RecordDialAttemptUseCase,
     GetLeadPreviewUseCase,
     ImportLeadsUseCase,
     CheckDNCUseCase,
     AddToDNCListUseCase,
+    // Services
+    PredictivePacerService,
+    PredictiveDialingService,
   ],
   exports: [
     // Export use cases for other modules
     StartProgressiveDialingUseCase,
+    StartPreviewDialingUseCase,
+    StartPredictiveDialingUseCase,
+    SkipLeadUseCase,
+    InitiatePreviewCallUseCase,
     AssignLeadToAgentUseCase,
     RecordDialAttemptUseCase,
     GetLeadPreviewUseCase,
