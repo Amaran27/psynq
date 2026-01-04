@@ -60,6 +60,32 @@ export class StorageService {
     );
   }
 
+  /**
+   * Get presigned URL for any file
+   */
+  async getPresignedUrl(
+    key: string,
+    organizationId: string | null = null,
+    expiresInSeconds = 3600,
+  ): Promise<string> {
+    return this.storageAdapter.getSignedUrl(
+      organizationId,
+      key,
+      expiresInSeconds,
+      'GET',
+    );
+  }
+
+  /**
+   * Delete any file from storage
+   */
+  async deleteFile(
+    key: string,
+    organizationId: string | null = null,
+  ): Promise<void> {
+    await this.storageAdapter.delete(organizationId, key);
+  }
+
   async healthCheck(organizationId: string | null = null): Promise<boolean> {
     return this.storageAdapter.healthCheck(organizationId);
   }

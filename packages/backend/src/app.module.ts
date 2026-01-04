@@ -13,7 +13,6 @@ import { ChannelEntity } from './entities/channel.entity';
 import { BridgeEntity } from './entities/bridge.entity';
 import { CampaignEntity } from './entities/campaign.entity';
 import { LeadEntity } from './entities/lead.entity';
-import { RecordingEntity } from './entities/recording.entity';
 import { SettingEntity } from './entities/setting.entity';
 import { AuthModule } from './auth/auth.module';
 import { CallModule } from './modules/call/call.module';
@@ -47,9 +46,12 @@ import { DialingSessionEntity } from './entities/dialer/dialing-session.entity';
 import { DNCEntryEntity } from './entities/dialer/dnc-entry.entity';
 import { IVRFlowEntity } from './entities/ivr-flow.entity';
 import { IVRExecutionLogEntity } from './entities/ivr-execution-log.entity';
+import { RecordingEntity as RecordingDBEntity } from './modules/recording/entities/recording.entity';
+import { CDREntity as CDRDBEntity } from './modules/cdr/entities/cdr.entity';
 import { IVRModule } from './modules/ivr/ivr.module';
 import { ConfigModule as AppConfigModule } from './config/config.module';
-// import { RecordingsModule } from './recordings/recordings.module'; // Temporarily disabled - missing minio module
+import { RecordingModule } from './modules/recording/recording.module';
+import { CDRModule } from './modules/cdr/cdr.module';
 
 @Module({
   imports: [
@@ -81,7 +83,6 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
           LeadEntity,
           UserEntity,
           CallParticipantEntity,
-          RecordingEntity,
           SettingEntity,
           OrganizationEntity,
           QueueEntity,
@@ -97,6 +98,8 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
           DNCEntryEntity,
           IVRFlowEntity,
           IVRExecutionLogEntity,
+          RecordingDBEntity,
+          CDRDBEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -113,6 +116,8 @@ import { ConfigModule as AppConfigModule } from './config/config.module';
     CampaignModule,
     DialerModule,
     IVRModule,
+    RecordingModule,
+    CDRModule,
     LeadModule,
     StorageModule,
     AsteriskModule,
