@@ -68,6 +68,9 @@ import { WhatsAppMessageEntity } from './modules/whatsapp/infrastructure/persist
 import { WhatsAppTemplateEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-template.entity';
 import { WhatsAppContactEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-contact.entity';
 import { WhatsAppConfigurationEntity } from './modules/whatsapp/infrastructure/persistence/typeorm/entities/whatsapp-configuration.entity';
+import { WalletModule } from './modules/wallet/wallet.module';
+import { WalletEntity as WalletSystemEntity } from './modules/wallet/infrastructure/persistence/typeorm/entities/wallet.entity';
+import { WalletTransactionEntity } from './modules/wallet/infrastructure/persistence/typeorm/entities/wallet-transaction.entity';
 
 @Module({
   imports: [
@@ -128,6 +131,8 @@ import { WhatsAppConfigurationEntity } from './modules/whatsapp/infrastructure/p
           WhatsAppTemplateEntity,
           WhatsAppContactEntity,
           WhatsAppConfigurationEntity,
+          WalletSystemEntity,
+          WalletTransactionEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -160,6 +165,7 @@ import { WhatsAppConfigurationEntity } from './modules/whatsapp/infrastructure/p
     ReportsModule,
     CrmModule,
     RatingModule,
+    WalletModule,
     // RecordingsModule, // Temporarily disabled - missing minio module
   ],
   controllers: [AppController, SettingsController, SystemSettingsController],
