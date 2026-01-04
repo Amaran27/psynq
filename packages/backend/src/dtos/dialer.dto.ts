@@ -404,3 +404,95 @@ export class PreviewCallResponseDto {
   @ApiProperty({ description: 'Status message', example: 'Call to +1234567890 initiated' })
   message: string;
 }
+
+// Predictive Dialer DTOs
+export class StartPredictiveDialingDto {
+  @ApiProperty({ description: 'Campaign ID', example: 'uuid' })
+  @IsString()
+  campaignId: string;
+
+  @ApiProperty({ description: 'Agent IDs participating in the session', type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  agentIds: string[];
+
+  @ApiPropertyOptional({ 
+    description: 'Target abandonment rate (0.01-0.15, default 0.03 = 3%)', 
+    example: 0.03,
+    minimum: 0.01,
+    maximum: 0.15,
+  })
+  @IsNumber()
+  @Min(0.01)
+  @Max(0.15)
+  @IsOptional()
+  targetAbandonmentRate?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Initial lines per agent ratio (algorithm adjusts dynamically)', 
+    example: 2.0,
+    minimum: 1.0,
+    maximum: 5.0,
+  })
+  @IsNumber()
+  @Min(1.0)
+  @Max(5.0)
+  @IsOptional()
+  linesPerAgent?: number;
+
+  @ApiPropertyOptional({ 
+    description: 'Maximum concurrent calls allowed', 
+    example: 50,
+    minimum: 1,
+  })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  maxConcurrentCalls?: number;
+}
+
+export class PredictiveDialingSessionResponseDto {
+  @ApiProperty({ description: 'Session ID', example: 'uuid' })
+  id: string;
+
+  @ApiProperty({ description: 'Campaign ID', example: 'uuid' })
+  campaignId: string;
+
+  @ApiProperty({ description: 'Dialing mode', example: 'predictive' })
+  mode: string;
+
+  @ApiProperty({ description: 'Session status', example: 'active' })
+  status: string;
+
+  @ApiProperty({ description: 'Pacing configuration' })
+  pacingConfig: {
+    linesPerAgent: number;
+    targetAbandonmentRate: number;
+    maxConcurrentCalls: number;
+    dialTimeoutSeconds: number;
+  };
+
+  @ApiProperty({ description: 'Session statistics' })
+  stats: {
+    leadsProcessed: number;
+    callsAttempted: number;
+    callsAnswered: number;
+    callsAbandoned: number;
+    avgWaitTimeSeconds: number;
+    avgTalkTimeSeconds: number;
+    conversionRate: number;
+  };
+
+  @ApiProperty({ description: 'Active agent IDs', type: [String] })
+  activeAgentIds: string[];
+
+  @ApiPropertyOptional({ description: 'Session start timestamp' })
+  startedAt?: Date;
+
+  @ApiProperty({ description: 'Session creation timestamp' })
+  createdAt: Date;
+
+  @ApiProperty({ description: 'Status message', example: 'Predictive dialing session started' })
+  message: string;
+}
+

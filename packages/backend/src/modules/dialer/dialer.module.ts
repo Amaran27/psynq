@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DialerController } from './dialer.controller';
 import { PreviewDialerController } from './preview-dialer.controller';
+import { PredictiveDialerController } from './predictive-dialer.controller';
 import { LeadEntity } from '../../entities/dialer/lead.entity';
 import { DialingSessionEntity } from '../../entities/dialer/dialing-session.entity';
 import { DNCEntryEntity } from '../../entities/dialer/dnc-entry.entity';
@@ -59,7 +60,7 @@ import { PredictiveDialingService } from './application/predictive-dialing.servi
     EventBusModule,
     CallModule,
   ],
-  controllers: [DialerController, PreviewDialerController],
+  controllers: [DialerController, PreviewDialerController, PredictiveDialerController],
   providers: [
     // Bind ports to adapters
     {
