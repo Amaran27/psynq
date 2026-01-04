@@ -52,6 +52,9 @@ import { IVRModule } from './modules/ivr/ivr.module';
 import { ConfigModule as AppConfigModule } from './config/config.module';
 import { RecordingModule } from './modules/recording/recording.module';
 import { CDRModule } from './modules/cdr/cdr.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { ReportTemplateEntity } from './entities/reports/report-template.entity';
+import { ReportExecutionEntity } from './entities/reports/report-execution.entity';
 
 @Module({
   imports: [
@@ -100,6 +103,8 @@ import { CDRModule } from './modules/cdr/cdr.module';
           IVRExecutionLogEntity,
           RecordingDBEntity,
           CDRDBEntity,
+          ReportTemplateEntity,
+          ReportExecutionEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -128,6 +133,7 @@ import { CDRModule } from './modules/cdr/cdr.module';
     SettingsModule,
     OrganizationModule,
     UserModule,
+    ReportsModule,
     // RecordingsModule, // Temporarily disabled - missing minio module
   ],
   controllers: [AppController, SettingsController, SystemSettingsController],
