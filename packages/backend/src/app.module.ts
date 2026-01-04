@@ -45,7 +45,7 @@ import { FailedLoginEntity } from './entities/failed-login.entity';
 import { LeadEntity as DialerLeadEntity } from './entities/dialer/lead.entity';
 import { DialingSessionEntity } from './entities/dialer/dialing-session.entity';
 import { DNCEntryEntity } from './entities/dialer/dnc-entry.entity';
-import { IVRFlowEntity } from './entities/ivr-flow.entity';
+import { IVRFlowEntity as OldIVRFlowEntity } from './entities/ivr-flow.entity';
 import { IVRExecutionLogEntity } from './entities/ivr-execution-log.entity';
 import { RecordingEntity as RecordingDBEntity } from './modules/recording/entities/recording.entity';
 import { CDREntity as CDRDBEntity } from './modules/cdr/entities/cdr.entity';
@@ -74,6 +74,9 @@ import { WalletTransactionEntity } from './modules/wallet/infrastructure/persist
 import { EvaluationModule } from './modules/evaluation/evaluation.module';
 import { ScorecardEntity } from './modules/evaluation/infrastructure/persistence/scorecard.entity';
 import { EvaluationEntity } from './modules/evaluation/infrastructure/persistence/evaluation.entity';
+import { IVRBuilderModule } from './modules/ivr-builder/ivr-builder.module';
+import { IVRFlowEntity } from './modules/ivr-builder/infrastructure/persistence/ivr-flow.entity';
+import { IVRExecutionEntity } from './modules/ivr-builder/infrastructure/persistence/ivr-execution.entity';
 
 @Module({
   imports: [
@@ -118,7 +121,7 @@ import { EvaluationEntity } from './modules/evaluation/infrastructure/persistenc
           DialerLeadEntity,
           DialingSessionEntity,
           DNCEntryEntity,
-          IVRFlowEntity,
+          OldIVRFlowEntity,
           IVRExecutionLogEntity,
           RecordingDBEntity,
           CDRDBEntity,
@@ -138,6 +141,8 @@ import { EvaluationEntity } from './modules/evaluation/infrastructure/persistenc
           WalletTransactionEntity,
           ScorecardEntity,
           EvaluationEntity,
+          IVRFlowEntity,
+          IVRExecutionEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -172,6 +177,7 @@ import { EvaluationEntity } from './modules/evaluation/infrastructure/persistenc
     RatingModule,
     WalletModule,
     EvaluationModule,
+    IVRBuilderModule,
     // RecordingsModule, // Temporarily disabled - missing minio module
   ],
   controllers: [AppController, SettingsController, SystemSettingsController],
