@@ -21,6 +21,7 @@ import { GetFlowAnalyticsUseCase } from './application/get-flow-analytics.usecas
 import { ExecuteIVRFlowUseCase } from './application/execute-ivr-flow.usecase';
 import { IVRController } from './ivr.controller';
 import { IVROrchestratorService } from './services/ivr-orchestrator.service';
+import { IVRDtmfBridgeService } from './services/ivr-dtmf-bridge.service';
 import { EventBusModule } from '../event-bus/event-bus.module';
 import { AsteriskModule } from '../asterisk/asterisk.module';
 
@@ -62,6 +63,7 @@ import { AsteriskModule } from '../asterisk/asterisk.module';
 
     // Services
     IVROrchestratorService,
+    IVRDtmfBridgeService,
   ],
   exports: [
     'IVR_FLOW_REPOSITORY',

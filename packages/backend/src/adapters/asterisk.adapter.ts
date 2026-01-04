@@ -305,8 +305,10 @@ export class AsteriskAdapter
   }
 
   private async handleCallHangup(orgId: string | null, channel: any) {
-    const callId = channel.variables?.CALL_ID;
+    const callId = channel.variables?.CALL_ID || channel.id;
     const bridgeId = channel.variables?.BRIDGE_ID;
+
+    this.logger.log(`Channel hangup: ${channel.id}, Call ID: ${callId}`);
 
     if (bridgeId) {
       await this.stopBridgeRecording(orgId, bridgeId, callId);
@@ -319,10 +321,11 @@ export class AsteriskAdapter
       timestamp: new Date(),
     });
 
+    // Use callId from channel variables, not channel.id
     await this.eventBus.publish({
       type: 'telephony.call_ended',
       organizationId: orgId || 'system',
-      payload: { callId: channel.id },
+      payload: { callId: callId },
       timestamp: new Date(),
     });
   }

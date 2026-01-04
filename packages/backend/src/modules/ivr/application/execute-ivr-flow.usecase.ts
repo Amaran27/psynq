@@ -11,6 +11,7 @@ import { IVRFlow, IVRNode, IVRNodeType } from '../domain/ivr-flow.domain';
 import { IVRExecutionLog, IVRExecutionStatus } from '../domain/ivr-execution-log.domain';
 import { TelephonyPort } from '../../../ports/telephony.port';
 import { EventBusPort } from '../../../ports/event-bus.port';
+import { DtmfHandlerService } from '../../asterisk/services/dtmf-handler.service';
 
 export interface IVRExecutionContext {
   callId: string;
@@ -33,6 +34,7 @@ export class ExecuteIVRFlowUseCase {
     private readonly telephonyProvider: TelephonyPort,
     @Inject('EVENT_BUS')
     private readonly eventBus: EventBusPort,
+    private readonly dtmfHandler: DtmfHandlerService,
   ) {}
 
   /**
@@ -201,8 +203,12 @@ export class ExecuteIVRFlowUseCase {
       finishOnKey: '',
     });
     
-    // TODO: Get digit from event handler
-    const digit = '1'; // Placeholder - needs DTMF event handler
+    // Collect digit from DTMF handler (waits for Asterisk DTMF event)
+    const digit = await this.dtmfHandler.collectDigits(
+      context.callId,
+      context.callId, // channelId same as callId for now
+      { maxDigits: 1, timeout: 5000, finishOnKey: '' },
+    );
 
     executionLog.addStep({
       nodeId: node.id,
@@ -271,8 +277,17 @@ export class ExecuteIVRFlowUseCase {
       finishOnKey: config.finishOnKey,
     });
     
-    // TODO: Get input from event handler
-    const input = ''; // Placeholder - needs DTMF event handler
+    // Collect input from DTMF handler (waits for Asterisk DTMF events)
+    const input = await this.dtmfHandler.collectDigits(
+      context.callId,
+      context.callId,
+      {
+        maxDigits: config.maxDigits,
+        timeout: config.timeout * 1000, // Convert seconds to ms
+        finishOnKey: config.finishOnKey,
+        minDigits: config.minDigits,
+      },
+    );
 
     // Store in variables
     context.variables[config.variableName] = input;
@@ -306,8 +321,16 @@ export class ExecuteIVRFlowUseCase {
     const config = node.transferConfig;
 
     try {
-      // TODO: Implement transfer via redirect or bridge
-      this.logger.warn(`Transfer not yet implemented - would transfer ${context.callId} to ${config.destination}`);
+      // Use redirect for blind transfer
+      const call = { id: context.callId } as any;
+      if (this.telephonyProvider.redirectCall) {
+        await this.telephonyProvider.redirectCall(call, config.destination);
+      } else {
+        // Fallback: use bridge for attended transfer
+        await this.telephonyProvider.bridgeParticipants(call, config.destination, {});
+      }
+      
+      this.logger.log(`Transferred call ${context.callId} to ${config.destination}`);
 
       executionLog.addStep({
         nodeId: node.id,
@@ -494,15 +517,31 @@ export class ExecuteIVRFlowUseCase {
       await this.playPrompt(context.callId, node.promptConfig);
     }
 
-    // Start recording
-    // TODO: Implement voicemail recording
+    // Start recording voicemail
+    // Note: ARI recording needs direct client access for channel.record()
+    // For now, log and publish event for external recording handler
     this.logger.log(`Recording voicemail for call ${context.callId}`);
+    
+    await this.eventBus.publish({
+      type: 'ivr.voicemail_recording_requested',
+      organizationId: context.flowId, // Use flowId as org context
+      payload: { 
+        callId: context.callId, 
+        nodeId: node.id,
+        duration: 120, // Max 2 minutes
+      },
+      timestamp: new Date(),
+    });
+
+    // Wait for recording to complete (TODO: implement proper async recording)
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     executionLog.addStep({
       nodeId: node.id,
       nodeType: node.type,
       action: 'voicemail_recorded',
       timestamp: new Date(),
+      output: 'Voicemail recording started',
     });
     await this.executionLogRepository.update(executionLog);
 
@@ -517,15 +556,22 @@ export class ExecuteIVRFlowUseCase {
     executionLog: IVRExecutionLog,
     context: IVRExecutionContext,
   ): Promise<void> {
-    // Find call entity to end it
-    // TODO: Implement proper call lookup and end
-    this.logger.log(`Ending call ${context.callId}`);
+    // End call via telephony provider
+    this.logger.log(`Ending call ${context.callId} via hangup node`);
+    
+    try {
+      const call = { id: context.callId } as any;
+      await this.telephonyProvider.endCall(call);
+    } catch (error) {
+      this.logger.error(`Failed to end call ${context.callId}: ${error.message}`);
+    }
 
     executionLog.addStep({
       nodeId: node.id,
       nodeType: node.type,
       action: 'hangup',
       timestamp: new Date(),
+      output: 'Call terminated by IVR',
     });
   }
 
