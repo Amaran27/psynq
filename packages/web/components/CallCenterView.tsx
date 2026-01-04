@@ -2,6 +2,7 @@ import { Call, CallState, AgentStatus } from '@psynq/core';
 import { AgentStatusSelector } from './AgentStatusSelector';
 import { AICoachingPanel } from './AICoachingPanel';
 import { useAuthStore } from '../stores/auth.store';
+import { Dialpad, ActiveCall, IncomingCallModal } from './dialer';
 
 interface CallStats {
   activeCalls: number;
@@ -80,6 +81,8 @@ export function CallCenterView({
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+      <IncomingCallModal />
+      
       {/* Header */}
       <header className="bg-white shadow-sm border-b z-10">
         <div className="px-6 py-3 flex justify-between items-center">
@@ -161,110 +164,17 @@ export function CallCenterView({
             </div>
           </div>
 
-          {/* Dialpad Area */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6">
-              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Dialpad</h2>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target as HTMLFormElement);
-                  const to = formData.get('to') as string;
-                  if (to) {
-                    onCreateCall(to);
-                    (e.target as HTMLFormElement).reset();
-                  }
-                }}
-                className="flex gap-3"
-              >
-                <input
-                  type="tel"
-                  name="to"
-                  placeholder="Enter phone number..."
-                  required
-                  disabled={!isAudioReady}
-                  className="flex-1 px-4 py-3 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 text-lg font-mono tracking-widest disabled:opacity-60"
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading || !isAudioReady}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-blue-200"
-                >
-                  Call
-                </button>
-              </form>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Dialpad Area */}
+            <div className="flex justify-center md:justify-start">
+              <Dialpad />
+            </div>
 
-              {!isAudioReady && (
-                <p className="text-xs text-gray-400 mt-2">
-                  Telephony unavailable. Try <button onClick={onRetryTelephony} className="underline text-gray-600">retrying</button> or check telephony service.
-                </p>
-              )}
+            {/* Active Call Control */}
+            <div className="flex justify-center md:justify-start">
+              {currentCall && <ActiveCall />}
             </div>
           </div>
-
-          {/* Active Call Control */}
-          {currentCall && (
-            <div className="bg-gray-900 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-              <div className="px-8 py-6 flex justify-between items-center border-b border-gray-800">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <h2 className="text-xl font-bold text-white tracking-tight">{currentCall.from}</h2>
-                  </div>
-                  <p className="text-gray-400 text-sm mt-1">
-                    {getStatusBadge(currentCall.state).text} • {formatDuration(currentCall.startedAt)}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono text-gray-500 block">CALL ID</span>
-                  <span className="text-[10px] font-mono text-gray-400 uppercase">{currentCall.id.split('-')[0]}</span>
-                </div>
-              </div>
-              
-              <div className="p-8 grid grid-cols-4 gap-4">
-                {currentCall.state === CallState.RINGING && currentCall.direction === 'inbound' && (
-                  <button
-                    onClick={() => onAnswerCall(currentCall.id)}
-                    className="col-span-2 bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-green-900/20"
-                  >
-                    Answer
-                  </button>
-                )}
-                {currentCall.state === CallState.RINGING && (
-                  <button
-                    onClick={() => onEndCall(currentCall.id)}
-                    className="col-span-2 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl"
-                  >
-                    Reject
-                  </button>
-                )}
-                {currentCall.state === CallState.ANSWERED && (
-                  <button
-                    onClick={() => onHoldCall(currentCall.id)}
-                    className="bg-gray-800 hover:bg-gray-700 text-white font-bold py-4 rounded-xl"
-                  >
-                    Hold
-                  </button>
-                )}
-                {currentCall.state === CallState.ON_HOLD && (
-                  <button
-                    onClick={() => onResumeCall(currentCall.id)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl"
-                  >
-                    Resume
-                  </button>
-                )}
-                {(currentCall.state === CallState.ANSWERED || currentCall.state === CallState.ON_HOLD) && (
-                  <button
-                    onClick={() => onEndCall(currentCall.id)}
-                    className="col-span-2 bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-red-900/20"
-                  >
-                    End Call
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* List of Other Active Calls */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
