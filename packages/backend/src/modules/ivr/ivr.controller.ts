@@ -37,6 +37,7 @@ import {
   ExecutionLogResponseDto,
   FlowAnalyticsQueryDto,
   FlowAnalyticsResponseDto,
+  IVRNodeDto,
 } from '../../dtos/ivr.dto';
 
 @ApiTags('IVR')
@@ -64,11 +65,25 @@ export class IVRController {
     @Body() dto: CreateFlowDto,
     @Request() req: any,
   ): Promise<FlowResponseDto> {
+    // Transform DTO nodes to domain format
+    const domainNodes = dto.nodes.map(node => {
+      if (node instanceof IVRNodeDto) {
+        return node.toDomain();
+      }
+      // Fallback: manually transform
+      const { config, label, ...rest } = node as any;
+      return {
+        ...rest,
+        name: label,
+        ...config,
+      };
+    });
+
     const flow = await this.createFlowUseCase.execute({
       name: dto.name,
       description: dto.description,
       organizationId: req.user.organizationId,
-      nodes: dto.nodes,
+      nodes: domainNodes,
       entryNodeId: dto.entryNodeId,
       variables: dto.variables,
     });
@@ -121,12 +136,28 @@ export class IVRController {
     @Body() dto: UpdateFlowDto,
     @Request() req: any,
   ): Promise<FlowResponseDto> {
+    // Transform DTO nodes to domain format if provided
+    let domainNodes = dto.nodes;
+    if (dto.nodes) {
+      domainNodes = dto.nodes.map(node => {
+        if (node instanceof IVRNodeDto) {
+          return node.toDomain();
+        }
+        const { config, label, ...rest } = node as any;
+        return {
+          ...rest,
+          name: label,
+          ...config,
+        };
+      });
+    }
+
     const flow = await this.updateFlowUseCase.execute({
       flowId: id,
       organizationId: req.user.organizationId,
       name: dto.name,
       description: dto.description,
-      nodes: dto.nodes,
+      nodes: domainNodes,
       entryNodeId: dto.entryNodeId,
       variables: dto.variables,
     });

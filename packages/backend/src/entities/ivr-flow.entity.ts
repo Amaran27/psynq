@@ -2,14 +2,14 @@
  * IVR Flow Entity (TypeORM - Database Layer)
  */
 
-import { Entity, Column, PrimaryColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 import { IVRFlowStatus, IVRNode } from '../modules/ivr/domain/ivr-flow.domain';
 
 @Entity('ivr_flows')
 @Index(['organizationId', 'status'])
 @Index(['organizationId', 'name'], { unique: true })
 export class IVRFlowEntity {
-  @PrimaryColumn('uuid')
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ name: 'organization_id' })

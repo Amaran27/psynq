@@ -129,7 +129,10 @@ export class TypeOrmIVRFlowRepositoryAdapter implements IVRFlowRepositoryPort {
    */
   private domainToEntity(domain: IVRFlow): IVRFlowEntity {
     const entity = new IVRFlowEntity();
-    entity.id = domain.id;
+    // Don't set ID for new entities - let database generate it
+    if (domain.id) {
+      entity.id = domain.id;
+    }
     entity.organizationId = domain.organizationId;
     entity.name = domain.name;
     entity.description = domain.description;

@@ -11,7 +11,7 @@ import { IVRFlowStatus } from '../modules/ivr/domain/ivr-flow.domain';
 import { IVRExecutionStatus } from '../modules/ivr/domain/ivr-execution-log.domain';
 
 /**
- * IVR Node DTO
+ * IVR Node DTO - Accepts generic config structure and transforms to domain model
  */
 export class IVRNodeDto {
   @ApiProperty()
@@ -26,13 +26,26 @@ export class IVRNodeDto {
   @IsString()
   label: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Node configuration - structure varies by node type' })
   @IsObject()
   config: Record<string, any>;
 
   @ApiProperty()
   @IsObject()
   position: { x: number; y: number };
+
+  /**
+   * Transform DTO to domain node structure
+   * Maps generic config object to node-specific properties
+   */
+  toDomain(): any {
+    const { config, label, ...rest } = this;
+    return {
+      ...rest,
+      name: label, // Map label to name for domain
+      ...config, // Spread config properties to top level
+    };
+  }
 }
 
 /**
@@ -137,7 +150,32 @@ export class FlowResponseDto {
     dto.description = flow.description;
     dto.organizationId = flow.organizationId;
     dto.status = flow.status;
-    dto.nodes = flow.nodes;
+    
+    // Transform domain nodes back to DTO format
+    dto.nodes = flow.nodes.map((node: any) => {
+      const { name, promptConfig, menuOptions, collectInputConfig, transferConfig,
+              webhookConfig, conditionConfig, queueConfig, voicemailConfig, 
+              nextNodeId, ...rest } = node;
+      
+      // Extract config properties based on node type
+      const config: any = {};
+      if (promptConfig) config.promptConfig = promptConfig;
+      if (menuOptions) config.menuOptions = menuOptions;
+      if (collectInputConfig) config.collectInputConfig = collectInputConfig;
+      if (transferConfig) config.transferConfig = transferConfig;
+      if (webhookConfig) config.webhookConfig = webhookConfig;
+      if (conditionConfig) config.conditionConfig = conditionConfig;
+      if (queueConfig) config.queueConfig = queueConfig;
+      if (voicemailConfig) config.voicemailConfig = voicemailConfig;
+      if (nextNodeId) config.nextNodeId = nextNodeId;
+      
+      return {
+        ...rest,
+        label: name,
+        config,
+      };
+    });
+    
     dto.entryNodeId = flow.entryNodeId;
     dto.variables = flow.variables;
     dto.createdAt = flow.createdAt;
