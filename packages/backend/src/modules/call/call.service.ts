@@ -121,18 +121,40 @@ export class CallService implements OnModuleInit {
   }
 
   private async handleCallEndedInternal(callId: string) {
-    const callEntity = await this.callRepository.findOneBy({
+    this.logger.log(`Handling call ended: ${callId}`);
+    
+    // Try to find by externalId first (Asterisk channel ID)
+    let callEntity = await this.callRepository.findOneBy({
       externalId: callId,
     });
-    if (!callEntity) return;
+    
+    // Fallback: try to find by primary id
+    if (!callEntity) {
+      this.logger.debug(`Call not found by externalId ${callId}, trying by id`);
+      callEntity = await this.callRepository.findOneBy({
+        id: callId,
+      });
+    }
+    
+    if (!callEntity) {
+      this.logger.warn(`Call not found for callId: ${callId}`);
+      return;
+    }
 
+    this.logger.log(`Found call ${callEntity.id}, current state: ${callEntity.state}, ending...`);
     const call = this.entityToDomain(callEntity);
     try {
       this.stateMachine.endCall(call);
       await this.callRepository.save(this.domainToEntity(call));
+      this.logger.log(`Call ${callEntity.id} ended, new state: ${call.state}`);
       await this.publishCallUpdate(this.mapToResponseDto(call));
     } catch (e) {
-      this.logger.warn(`Failed to end call via state machine: ${e.message}`);
+      this.logger.error(`Failed to end call ${callId} via state machine: ${e.message}`);
+      // Force update state even if state machine fails
+      callEntity.state = CallState.ENDED;
+      callEntity.endedAt = new Date();
+      await this.callRepository.save(callEntity);
+      await this.publishCallUpdate(this.mapToResponseDto(this.entityToDomain(callEntity)));
     }
   }
 
