@@ -55,6 +55,9 @@ import { CDRModule } from './modules/cdr/cdr.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ReportTemplateEntity } from './entities/reports/report-template.entity';
 import { ReportExecutionEntity } from './entities/reports/report-execution.entity';
+import { CrmModule } from './modules/crm/crm.module';
+import { CrmIntegrationEntity } from './modules/crm/infrastructure/persistence/crm-integration.entity';
+import { SalesforceConnectionEntity } from './modules/crm/infrastructure/persistence/salesforce-connection.entity';
 
 @Module({
   imports: [
@@ -105,6 +108,8 @@ import { ReportExecutionEntity } from './entities/reports/report-execution.entit
           CDRDBEntity,
           ReportTemplateEntity,
           ReportExecutionEntity,
+          CrmIntegrationEntity,
+          SalesforceConnectionEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -134,6 +139,7 @@ import { ReportExecutionEntity } from './entities/reports/report-execution.entit
     OrganizationModule,
     UserModule,
     ReportsModule,
+    CrmModule,
     // RecordingsModule, // Temporarily disabled - missing minio module
   ],
   controllers: [AppController, SettingsController, SystemSettingsController],
