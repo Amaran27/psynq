@@ -7,8 +7,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WalletRepository } from '../../../domain/ports';
-import { Wallet, WalletType, WalletStatus, Currency } from '../../../domain/wallet.domain';
+import { WalletRepository } from '../../../../domain/ports/wallet-repository.port';
+import { Wallet, WalletType, WalletStatus, Currency } from '../../../../domain/wallet.domain';
 import { WalletEntity } from '../entities/wallet.entity';
 
 @Injectable()

@@ -35,7 +35,7 @@ export class WalletTransaction {
     public readonly referenceType?: string, // Type of reference (invoice, call, campaign, etc.)
     public readonly reason?: string,
     public readonly initiatedBy?: string, // User/system who initiated
-    public readonly metadata?: Record<string, any>,
+    public metadata?: Record<string, any>,
     public readonly createdAt?: Date,
     public updatedAt?: Date,
   ) {

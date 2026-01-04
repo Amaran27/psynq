@@ -14,7 +14,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { OrganizationEntity } from '../../../../organizations/infrastructure/persistence/typeorm/entities/organization.entity';
+import { OrganizationEntity } from '../../../../../../entities/organization.entity';
 import { WalletEntity } from './wallet.entity';
 
 @Entity('wallet_transactions')
