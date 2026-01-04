@@ -3,9 +3,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DialerController } from './dialer.controller';
 import { PreviewDialerController } from './preview-dialer.controller';
 import { PredictiveDialerController } from './predictive-dialer.controller';
+import { PacingEngineController } from './pacing-engine.controller';
 import { LeadEntity } from '../../entities/dialer/lead.entity';
 import { DialingSessionEntity } from '../../entities/dialer/dialing-session.entity';
 import { DNCEntryEntity } from '../../entities/dialer/dnc-entry.entity';
+import { PacingEngineEntity } from '../../entities/dialer/pacing-engine.entity';
 import { CampaignEntity } from '../../entities/campaign.entity';
 import { EventBusModule } from '../event-bus/event-bus.module';
 import { CallModule } from '../call/call.module';
@@ -14,12 +16,14 @@ import { CallModule } from '../call/call.module';
 import { LEAD_REPOSITORY_PORT } from './ports/lead-repository.port';
 import { DIALING_SESSION_REPOSITORY_PORT } from './ports/dialing-session-repository.port';
 import { DNC_REPOSITORY_PORT } from './ports/dnc-repository.port';
+import { PACING_ENGINE_REPOSITORY_PORT } from './ports/pacing-engine-repository.port';
 import { CAMPAIGN_REPOSITORY_PORT } from '../campaign/ports/campaign-repository.port';
 
 // Adapters
 import { TypeOrmLeadRepositoryAdapter } from './adapters/typeorm-lead-repository.adapter';
 import { TypeOrmDialingSessionRepositoryAdapter } from './adapters/typeorm-dialing-session-repository.adapter';
 import { TypeOrmDNCRepositoryAdapter } from './adapters/typeorm-dnc-repository.adapter';
+import { TypeOrmPacingEngineRepositoryAdapter } from './adapters/typeorm-pacing-engine-repository.adapter';
 import { TypeOrmCampaignRepositoryAdapter } from '../campaign/adapters/typeorm-campaign-repository.adapter';
 
 // Use Cases
@@ -38,6 +42,7 @@ import { AddToDNCListUseCase } from './application/add-to-dnc-list.usecase';
 // Services
 import { PredictivePacerService } from './application/predictive-pacer.service';
 import { PredictiveDialingService } from './application/predictive-dialing.service';
+import { PacingEngineService } from './application/pacing-engine.service';
 
 /**
  * Dialer Module (Hexagonal Architecture)
@@ -55,12 +60,13 @@ import { PredictiveDialingService } from './application/predictive-dialing.servi
       LeadEntity,
       DialingSessionEntity,
       DNCEntryEntity,
+      PacingEngineEntity,
       CampaignEntity,
     ]),
     EventBusModule,
     CallModule,
   ],
-  controllers: [DialerController, PreviewDialerController, PredictiveDialerController],
+  controllers: [DialerController, PreviewDialerController, PredictiveDialerController, PacingEngineController],
   providers: [
     // Bind ports to adapters
     {
@@ -79,6 +85,10 @@ import { PredictiveDialingService } from './application/predictive-dialing.servi
       provide: CAMPAIGN_REPOSITORY_PORT,
       useClass: TypeOrmCampaignRepositoryAdapter,
     },
+    {
+      provide: PACING_ENGINE_REPOSITORY_PORT,
+      useClass: TypeOrmPacingEngineRepositoryAdapter,
+    },
     // Register use cases
     StartProgressiveDialingUseCase,
     StartPreviewDialingUseCase,
@@ -94,6 +104,7 @@ import { PredictiveDialingService } from './application/predictive-dialing.servi
     // Services
     PredictivePacerService,
     PredictiveDialingService,
+    PacingEngineService,
   ],
   exports: [
     // Export use cases for other modules
