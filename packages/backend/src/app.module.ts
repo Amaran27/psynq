@@ -77,6 +77,9 @@ import { EvaluationEntity } from './modules/evaluation/infrastructure/persistenc
 import { IVRBuilderModule } from './modules/ivr-builder/ivr-builder.module';
 import { IVRFlowEntity } from './modules/ivr-builder/infrastructure/persistence/ivr-flow.entity';
 import { IVRExecutionEntity } from './modules/ivr-builder/infrastructure/persistence/ivr-execution.entity';
+import { ForecastingModule } from './modules/forecasting/forecasting.module';
+import { ForecastEntity } from './modules/forecasting/entities/forecast.entity';
+import { ForecastModelEntity } from './modules/forecasting/entities/forecast-model.entity';
 
 @Module({
   imports: [
@@ -143,6 +146,8 @@ import { IVRExecutionEntity } from './modules/ivr-builder/infrastructure/persist
           EvaluationEntity,
           IVRFlowEntity,
           IVRExecutionEntity,
+          ForecastEntity,
+          ForecastModelEntity,
         ],
         synchronize: configService.get<string>('NODE_ENV') !== 'production',
         migrations: [__dirname + '/migrations/*.{ts,js}'],
@@ -178,6 +183,7 @@ import { IVRExecutionEntity } from './modules/ivr-builder/infrastructure/persist
     WalletModule,
     EvaluationModule,
     IVRBuilderModule,
+    ForecastingModule,
     // RecordingsModule, // Temporarily disabled - missing minio module
   ],
   controllers: [AppController, SettingsController, SystemSettingsController],
